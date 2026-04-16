@@ -1,0 +1,1026 @@
+﻿{
+    "mode":  "Full",
+    "base_url":  "http://127.0.0.1:8000/api",
+    "generated_at":  "2026-04-16T15:32:00.7482774+03:00",
+    "total_checks":  113,
+    "failed_checks":  0,
+    "results":  [
+                    {
+                        "step":  "auth_login_company",
+                        "method":  "POST",
+                        "path":  "/auth/login",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "auth_session_company",
+                        "method":  "GET",
+                        "path":  "/auth/session",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "auth_invite_activate_probe",
+                        "method":  "POST",
+                        "path":  "/auth/invite/activate",
+                        "expected":  "200/400/404",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "buildings_list",
+                        "method":  "GET",
+                        "path":  "/buildings",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "building_detail",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "building_departments",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift/departments",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "floor_workspace",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift/floors/3/workspace",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "workspace_employee_context",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift/floors/3/workspace/employee/emp-1",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "employee_profile",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift/floors/3/employees/emp-1/profile",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "workspace_context_alias",
+                        "method":  "GET",
+                        "path":  "/buildings/bcs-drift/floors/3/workspace-context?employee_id=emp-1",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "workspace_context_global_alias",
+                        "method":  "GET",
+                        "path":  "/workspace/context?building_id=bcs-drift\u0026floor_id=3\u0026employee_id=emp-1",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "employee_profile_global_alias",
+                        "method":  "GET",
+                        "path":  "/employees/emp-1/profile?building_id=bcs-drift\u0026floor_id=3",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "projects_list",
+                        "method":  "GET",
+                        "path":  "/projects",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "projects_filter_status",
+                        "method":  "GET",
+                        "path":  "/projects?status=active",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "projects_filter_q",
+                        "method":  "GET",
+                        "path":  "/projects?q=demo",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "employees_list_for_project_member",
+                        "method":  "GET",
+                        "path":  "/employees",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_create_try_org_1",
+                        "method":  "POST",
+                        "path":  "/projects",
+                        "expected":  "201/400",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_create",
+                        "method":  "POST",
+                        "path":  "/projects",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  "name=Smoke Runner Project 20260416153156"
+                    },
+                    {
+                        "step":  "project_detail",
+                        "method":  "GET",
+                        "path":  "/projects/28",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_patch",
+                        "method":  "PATCH",
+                        "path":  "/projects/28",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_archive",
+                        "method":  "POST",
+                        "path":  "/projects/28/archive",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_restore",
+                        "method":  "POST",
+                        "path":  "/projects/28/restore",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_members_list",
+                        "method":  "GET",
+                        "path":  "/projects/28/members",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_member_create",
+                        "method":  "POST",
+                        "path":  "/projects/28/members",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_member_patch",
+                        "method":  "PATCH",
+                        "path":  "/projects/28/members/53",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "project_member_delete",
+                        "method":  "DELETE",
+                        "path":  "/projects/28/members/53",
+                        "expected":  "204",
+                        "actual":  204,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_list",
+                        "method":  "GET",
+                        "path":  "/tasks",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_filter_status",
+                        "method":  "GET",
+                        "path":  "/tasks?status=todo",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_filter_priority",
+                        "method":  "GET",
+                        "path":  "/tasks?priority=high",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_filter_status_invalid",
+                        "method":  "GET",
+                        "path":  "/tasks?status=invalid_status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_filter_status_invalid_detail",
+                        "method":  "GET",
+                        "path":  "/tasks?status=invalid_status",
+                        "expected":  "detail contains Allowed:",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_filter_priority_invalid",
+                        "method":  "GET",
+                        "path":  "/tasks?priority=invalid_priority",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_stats",
+                        "method":  "GET",
+                        "path":  "/tasks/stats",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_board",
+                        "method":  "GET",
+                        "path":  "/tasks/board",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_board_priority_invalid",
+                        "method":  "GET",
+                        "path":  "/tasks/board?priority=invalid_priority",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_list_cursor_first",
+                        "method":  "GET",
+                        "path":  "/tasks?cursor=\u0026page_size=2",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_list_cursor_next",
+                        "method":  "GET",
+                        "path":  "/tasks?cursor=2026-04-15T09%3A30%3A00Z%3A%3A2001\u0026page_size=2",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_list_cursor_invalid",
+                        "method":  "GET",
+                        "path":  "/tasks?cursor=invalid\u0026page_size=2",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_create_invalid_assignee",
+                        "method":  "POST",
+                        "path":  "/tasks",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_create",
+                        "method":  "POST",
+                        "path":  "/tasks",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_detail",
+                        "method":  "GET",
+                        "path":  "/tasks/2006",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_patch",
+                        "method":  "PATCH",
+                        "path":  "/tasks/2006",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_bulk_status",
+                        "method":  "PATCH",
+                        "path":  "/tasks/bulk/status",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_bulk_status_duplicate_ids",
+                        "method":  "PATCH",
+                        "path":  "/tasks/bulk/status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_bulk_assign",
+                        "method":  "PATCH",
+                        "path":  "/tasks/bulk/assign",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "tasks_bulk_assign_invalid_assignee",
+                        "method":  "PATCH",
+                        "path":  "/tasks/bulk/assign",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_activity_list",
+                        "method":  "GET",
+                        "path":  "/tasks/2006/activity?page=1\u0026page_size=5",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_activity_cursor_invalid",
+                        "method":  "GET",
+                        "path":  "/tasks/2006/activity?cursor=invalid\u0026page_size=2",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_delete",
+                        "method":  "DELETE",
+                        "path":  "/tasks/2006",
+                        "expected":  "204",
+                        "actual":  204,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "task_detail_after_delete",
+                        "method":  "GET",
+                        "path":  "/tasks/2006",
+                        "expected":  "404",
+                        "actual":  404,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_overview",
+                        "method":  "GET",
+                        "path":  "/company/admin/overview",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_departments",
+                        "method":  "GET",
+                        "path":  "/company/admin/departments",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_users",
+                        "method":  "GET",
+                        "path":  "/company/admin/users?q=demo",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_users_invalid_role_filter",
+                        "method":  "GET",
+                        "path":  "/company/admin/users?role=invalid_role",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_users_invalid_role_filter_detail",
+                        "method":  "GET",
+                        "path":  "/company/admin/users?role=invalid_role",
+                        "expected":  "detail contains Allowed:",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_users_invalid_status_filter",
+                        "method":  "GET",
+                        "path":  "/company/admin/users?status=invalid_status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_invites",
+                        "method":  "GET",
+                        "path":  "/company/admin/invites",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_overview",
+                        "method":  "GET",
+                        "path":  "/admin/company/overview",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_departments",
+                        "method":  "GET",
+                        "path":  "/admin/company/departments",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_users",
+                        "method":  "GET",
+                        "path":  "/admin/company/users?q=demo",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_invites",
+                        "method":  "GET",
+                        "path":  "/admin/company/invites",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_users_all",
+                        "method":  "GET",
+                        "path":  "/company/admin/users",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_user_role_update",
+                        "method":  "PATCH",
+                        "path":  "/company/admin/users/11/role",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_user_role_update",
+                        "method":  "PATCH",
+                        "path":  "/admin/company/users/11/role",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_user_role_update_invalid_role",
+                        "method":  "PATCH",
+                        "path":  "/company/admin/users/11/role",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_user_role_update_not_found",
+                        "method":  "PATCH",
+                        "path":  "/company/admin/users/999999/role",
+                        "expected":  "404",
+                        "actual":  404,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_invite_create",
+                        "method":  "POST",
+                        "path":  "/company/admin/invites",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_invite_create_invalid_role",
+                        "method":  "POST",
+                        "path":  "/company/admin/invites",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_invite_revoke",
+                        "method":  "POST",
+                        "path":  "/company/admin/invites/1003/revoke",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "company_invite_revoke_not_found",
+                        "method":  "POST",
+                        "path":  "/company/admin/invites/999999/revoke",
+                        "expected":  "404",
+                        "actual":  404,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_invite_create",
+                        "method":  "POST",
+                        "path":  "/admin/company/invites",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_company_invite_revoke",
+                        "method":  "POST",
+                        "path":  "/admin/company/invites/1004/revoke",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "auth_login_super",
+                        "method":  "POST",
+                        "path":  "/auth/login",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_overview",
+                        "method":  "GET",
+                        "path":  "/admin/platform/overview",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenants",
+                        "method":  "GET",
+                        "path":  "/admin/platform/tenants",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenants_invalid_status_filter",
+                        "method":  "GET",
+                        "path":  "/admin/platform/tenants?status=invalid_status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_users",
+                        "method":  "GET",
+                        "path":  "/admin/platform/users",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invites",
+                        "method":  "GET",
+                        "path":  "/admin/platform/invites",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_stats",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/stats",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_events",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/events?page=1\u0026page_size=5",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_events_cursor",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/events?cursor=\u0026page_size=2",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_events_invalid_severity",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/events?severity=invalid_severity",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_events_invalid_status",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/events?status=invalid_status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_stats",
+                        "method":  "GET",
+                        "path":  "/admin/actions/stats",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_events",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events?page=1\u0026page_size=5",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_events_cursor",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events?cursor=\u0026page_size=2",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_events_invalid_scope",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events?scope=invalid_scope",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_events_invalid_severity",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events?severity=invalid_severity",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_actions_events_invalid_status",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events?status=invalid_status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "admin_action_detail",
+                        "method":  "GET",
+                        "path":  "/admin/actions/events/101",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_overview",
+                        "method":  "GET",
+                        "path":  "/platform/admin/overview",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_tenants",
+                        "method":  "GET",
+                        "path":  "/platform/admin/tenants",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_users",
+                        "method":  "GET",
+                        "path":  "/platform/admin/users",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_invites",
+                        "method":  "GET",
+                        "path":  "/platform/admin/invites",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_audit_stats",
+                        "method":  "GET",
+                        "path":  "/platform/admin/audit/stats",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_audit_events",
+                        "method":  "GET",
+                        "path":  "/platform/admin/audit/events?page=1\u0026page_size=5",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenant_create",
+                        "method":  "POST",
+                        "path":  "/admin/platform/tenants",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenant_status_patch",
+                        "method":  "PATCH",
+                        "path":  "/admin/platform/tenants/302/status",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_tenant_status_patch",
+                        "method":  "PATCH",
+                        "path":  "/platform/admin/tenants/302/status",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenant_status_patch_invalid_status",
+                        "method":  "PATCH",
+                        "path":  "/admin/platform/tenants/302/status",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_tenant_status_patch_not_found",
+                        "method":  "PATCH",
+                        "path":  "/admin/platform/tenants/999999/status",
+                        "expected":  "404",
+                        "actual":  404,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invite_create",
+                        "method":  "POST",
+                        "path":  "/admin/platform/invites",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invite_create_invalid_role",
+                        "method":  "POST",
+                        "path":  "/admin/platform/invites",
+                        "expected":  "400",
+                        "actual":  400,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invite_revoke",
+                        "method":  "POST",
+                        "path":  "/admin/platform/invites/2003/revoke",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invite_revoke_not_found",
+                        "method":  "POST",
+                        "path":  "/admin/platform/invites/999999/revoke",
+                        "expected":  "404",
+                        "actual":  404,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_invite_create_for_alias_revoke",
+                        "method":  "POST",
+                        "path":  "/admin/platform/invites",
+                        "expected":  "201",
+                        "actual":  201,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_invite_revoke",
+                        "method":  "POST",
+                        "path":  "/platform/admin/invites/2004/revoke",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_export",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/export",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "platform_audit_export_headers",
+                        "method":  "GET",
+                        "path":  "/admin/platform/audit/export",
+                        "expected":  "text/csv + Content-Disposition",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  "ct=text/csv; cd=attachment; filename=\"platform-audit-2026-04-16.csv\""
+                    },
+                    {
+                        "step":  "alias_platform_audit_export",
+                        "method":  "GET",
+                        "path":  "/platform/admin/audit/export",
+                        "expected":  "200",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "alias_platform_audit_export_headers",
+                        "method":  "GET",
+                        "path":  "/platform/admin/audit/export",
+                        "expected":  "text/csv + Content-Disposition",
+                        "actual":  200,
+                        "ok":  true,
+                        "note":  "ct=text/csv; cd=attachment; filename=\"platform-audit-2026-04-16.csv\""
+                    },
+                    {
+                        "step":  "auth_logout_company",
+                        "method":  "POST",
+                        "path":  "/auth/logout",
+                        "expected":  "200/204",
+                        "actual":  204,
+                        "ok":  true,
+                        "note":  ""
+                    },
+                    {
+                        "step":  "auth_logout_super",
+                        "method":  "POST",
+                        "path":  "/auth/logout",
+                        "expected":  "200/204",
+                        "actual":  204,
+                        "ok":  true,
+                        "note":  ""
+                    }
+                ]
+}

@@ -1,0 +1,614 @@
+
+Построить production-ready backend для ATOM AI Workspace, который:
+
+* поддерживает структуру компании с иерархией,
+* даёт проектный и организационный контекст,
+* подключает внешние источники,
+* обеспечивает AI-чат и summaries,
+* масштабируется на компанию ~500 сотрудников,
+* и главное — стабильно обслуживает существующий frontend-контракт. 
+
+---
+
+## 1. С чего начинаем
+
+Начинаем **не с коннекторов и не с AI**, а с **фундамента**.
+
+### Этап старта
+
+Сначала backend-команда должна поднять 4 базовых слоя:
+
+1. **Platform foundation**
+
+   * Django monolith skeleton
+   * DRF
+   * PostgreSQL
+   * Redis
+   * Celery
+   * MinIO/S3
+   * settings: local / stage / prod
+   * health checks
+   * logging / Sentry / metrics
+
+2. **Identity + Organization**
+
+   * user
+   * organization
+   * org hierarchy
+   * roles
+   * memberships
+   * department/team structure
+
+3. **API contract layer**
+
+   * `/api/v1`
+   * OpenAPI schema
+   * единый error format
+   * единый pagination format
+   * `snake_case` responses
+   * согласованные query params: `q`, `status`, `sort`, `page`, `page_size`
+
+4. **Workspace core**
+
+   * projects
+   * chats
+   * messages
+   * ai_run skeleton
+
+Порядок именно такой, потому что фронт уже построен вокруг стабильного API-фасада, normalizers и hooks, а также ожидает Django/DRF-совместимую форму данных. Это делает backend API-контракт задачей первого порядка, а не “потом допишем”. 
+
+---
+
+## 2. Какой должна быть структура backend-проекта
+
+Я бы утвердил такую структуру.
+
+```text id="64114"
+backend/
+  apps/
+    core/
+    identity/
+    organizations/
+    orgstructure/
+    teams/
+    projects/
+    connectors/
+    sync/
+    documents/
+    mail/
+    issues/
+    knowledge/
+    chats/
+    ai/
+    llm_gateway/
+    usage_billing/
+    activity/
+    audit/
+    files/
+  config/
+    settings/
+      base.py
+      local.py
+      stage.py
+      prod.py
+    urls.py
+    asgi.py
+    wsgi.py
+    celery.py
+  tests/
+    unit/
+    integration/
+    permissions/
+    connectors/
+    ai/
+  scripts/
+  manage.py
+```
+
+### Внутри каждого app
+
+```text id="61606"
+apps/<domain>/
+  admin/
+  api/
+    serializers.py
+    views.py
+    urls.py
+    filters.py
+  models/
+  services/
+  selectors/
+  tasks/
+  tests/
+  permissions.py
+  constants.py
+```
+
+### Правило структуры
+
+* `models` — только данные и связи
+* `serializers/api` — только транспортный слой
+* `services` — бизнес-логика
+* `selectors` — чтение/выборки
+* `tasks` — фоновые процессы
+* `permissions.py` — объектные и доменные проверки доступа
+
+Это нужно, чтобы не свалиться в типичный хаос “всё в views.py”.
+
+---
+
+## 3. Какие app-модули делаем первыми
+
+### Волна 1 — обязательное ядро
+
+* `core`
+* `identity`
+* `organizations`
+* `orgstructure`
+* `projects`
+* `chats`
+* `ai`
+* `audit`
+
+### Волна 2 — внешний контекст
+
+* `connectors`
+* `sync`
+* `documents`
+* `mail`
+* `issues`
+* `knowledge`
+
+### Волна 3 — enterprise-слой
+
+* `llm_gateway`
+* `usage_billing`
+* `activity`
+* `teams`
+* `files`
+
+---
+
+## 4. Что backend должен гарантировать фронту
+
+Это нужно прямо зафиксировать как правило команды.
+
+### Backend contract rules
+
+1. Все endpoint’ы идут через `/api/v1`
+2. Все поля на сервере — `snake_case`
+3. Все списки имеют одну пагинацию
+4. Все list-endpoints поддерживают `q`, `status`, `sort`, где это применимо
+5. Все ошибки возвращаются в одном формате
+6. Все долгие операции идут через async job/run
+7. AI-ответы обязаны возвращать `run_id`, `status`, `citations`, `usage`, `provider`, `model`
+8. Backend не ломает поля молча без согласования с frontend
+
+Это полностью совпадает с тем, как у вас уже устроено расширение сущностей и endpoint’ов на фронте: `liveClient.ts`, `normalizers.ts`, контракт `ApiClient`, фасад `lib/api`, hooks и отсутствие прямых HTTP-вызовов из UI. 
+
+---
+
+## 5. Первый набор таблиц
+
+Ниже именно то, что нужно сделать первым.
+
+### identity
+
+* `user`
+* `role`
+* `user_role`
+* `user_session`
+
+### organizations / orgstructure
+
+* `organization`
+* `organization_member`
+* `org_unit`
+* `org_unit_member`
+* `user_manager_link`
+
+### projects
+
+* `project`
+* `project_member`
+
+### chats / ai
+
+* `chat`
+* `chat_member`
+* `message`
+* `ai_run`
+* `summary`
+
+### audit
+
+* `audit_log`
+* `access_decision_log`
+
+### connectors / sync
+
+* `connector`
+* `external_account`
+* `sync_job`
+* `sync_run`
+* `sync_cursor`
+
+### normalized data
+
+* `document`
+* `email_thread`
+* `email_message`
+* `issue`
+* `knowledge_item`
+* `knowledge_chunk`
+
+---
+
+## 6. Поэтапные шаги для backend-отдела
+
+## Phase 0 — Technical foundation
+
+Срок: первый короткий этап
+
+### Что делаем
+
+* создаём backend repository structure
+* поднимаем Django + DRF
+* подключаем PostgreSQL, Redis, Celery
+* настраиваем ASGI
+* настраиваем env-конфиги
+* собираем stage окружение
+* подключаем Sentry/logging
+* делаем health endpoints
+* подключаем Django admin как внутренний backoffice
+
+### Результат
+
+Команда может деплоить backend в stage, есть база, очереди, логирование и каркас приложений.
+
+---
+
+## Phase 1 — Identity, Organization, Hierarchy
+
+Это первый настоящий бизнес-этап.
+
+### Что делаем
+
+* модель пользователя
+* организация
+* иерархия подразделений
+* роли:
+
+  * employee
+  * team_lead
+  * department_head
+  * executive
+  * admin
+* memberships
+* менеджерская линия
+* базовые permission checks
+
+### Какие endpoint’ы делаем
+
+* `GET /api/v1/me`
+* `GET /api/v1/org/units`
+* `GET /api/v1/org/units/{id}`
+* `GET /api/v1/org/units/{id}/children`
+* `GET /api/v1/org/units/{id}/members`
+* `GET /api/v1/employees`
+* `GET /api/v1/employees/{id}`
+
+### Definition of Done
+
+* можно авторизоваться
+* есть организация
+* есть дерево отделов
+* есть сотрудники и руководители
+* фронт может рисовать организационную структуру и карточки
+
+---
+
+## Phase 2 — Projects + Workspace Core
+
+Теперь делаем рабочий контур сотрудника.
+
+### Что делаем
+
+* проекты
+* участники проектов
+* базовая activity model
+* чаты
+* сообщения
+* ai_run skeleton
+* связь чата с проектом
+
+### Endpoint’ы
+
+* `GET /api/v1/projects`
+* `GET /api/v1/projects/{id}`
+* `GET /api/v1/projects/{id}/members`
+* `GET /api/v1/chats`
+* `POST /api/v1/chats`
+* `GET /api/v1/chats/{id}`
+* `GET /api/v1/chats/{id}/messages`
+* `POST /api/v1/chats/{id}/messages`
+
+### Definition of Done
+
+* фронт открывает список проектов
+* фронт открывает чат
+* сообщения сохраняются
+* чат привязан к проекту
+* есть база для AI-ответа
+
+---
+
+## Phase 3 — LLM Gateway v1
+
+Это отдельная важная задача, её не надо размазывать по проекту.
+
+### Что делаем
+
+* `llm_provider`
+* `llm_model`
+* `llm_model_profile`
+* адаптер OpenAI
+* адаптер Claude
+* адаптер Gemini
+* routing rules
+* request log
+* usage accounting basic
+* quota skeleton
+
+### Профили моделей
+
+* `chat_fast`
+* `chat_balanced`
+* `chat_deep`
+* `summary_fast`
+* `summary_batch`
+* `image_generate`
+
+### Definition of Done
+
+* backend может сходить в 2–3 провайдера через единый gateway
+* фронт не знает, в какой провайдер ушёл запрос
+* usage и model/provider логируются
+
+---
+
+## Phase 4 — Connectors + Sync
+
+Только после ядра и gateway.
+
+### Что делаем
+
+* Google Drive read-only
+* Gmail read-only
+* Jira read-only
+* OAuth/connect flows
+* sync jobs
+* sync runs
+* sync cursors
+* retries
+* connector status
+
+### Endpoint’ы
+
+* `GET /api/v1/connectors`
+* `POST /api/v1/connectors/{provider}/connect`
+* `GET /api/v1/connectors/accounts`
+* `POST /api/v1/connectors/accounts/{id}/sync`
+* `GET /api/v1/connectors/accounts/{id}/status`
+
+### Definition of Done
+
+* аккаунт подключается
+* синк запускается
+* статус синка виден
+* ошибки синка видны в системе
+
+---
+
+## Phase 5 — Normalization + Knowledge + Retrieval
+
+Теперь превращаем внешние данные в AI-контекст.
+
+### Что делаем
+
+* нормализуем документы
+* нормализуем письма
+* нормализуем задачи
+* делаем knowledge items
+* делаем chunks
+* делаем embeddings
+* делаем hybrid retrieval
+* делаем citations
+
+### Endpoint’ы
+
+* `GET /api/v1/documents`
+* `GET /api/v1/documents/{id}`
+* `GET /api/v1/email/threads`
+* `GET /api/v1/email/threads/{id}`
+* `GET /api/v1/issues`
+* `GET /api/v1/issues/{id}`
+* `POST /api/v1/ai/runs`
+* `GET /api/v1/ai/runs/{id}`
+* `GET /api/v1/ai/runs/{id}/stream`
+
+### Definition of Done
+
+* AI-чат получает проектный контекст
+* ответы содержат источники
+* retrieval уважает права доступа
+
+---
+
+## 7. Очередность работ по спринтам
+
+## Sprint 1
+
+Фокус: foundation + org structure
+
+Задачи:
+
+* repo skeleton
+* envs
+* DB/Redis/Celery
+* auth skeleton
+* user / organization / org_unit / roles
+* DRF base config
+* OpenAPI setup
+* unified error schema
+* pagination base
+* `/me`, `/org/units`, `/employees`
+
+Результат:
+
+* рабочий stage backend
+* первые реальные данные для фронта
+
+## Sprint 2
+
+Фокус: projects + chats + ai_run
+
+Задачи:
+
+* project / project_member
+* chat / message
+* ai_run
+* basic audit
+* list filters `q/status/sort`
+* SSE streaming skeleton
+* first project-aware endpoints
+
+Результат:
+
+* фронт может открыть workspace и работать с чатами
+
+## Sprint 3
+
+Фокус: llm gateway v1
+
+Задачи:
+
+* provider adapters
+* model profiles
+* usage log
+* provider selection rules
+* timeout / retry / fallback policy
+
+Результат:
+
+* backend умеет стабильно работать с OpenAI / Claude / Gemini через единый слой
+
+## Sprint 4
+
+Фокус: connectors + sync
+
+## Sprint 5
+
+Фокус: normalization + retrieval alpha
+
+---
+
+## 8. Что должно быть сделано раньше всего, если ресурсов мало
+
+Если команда ограничена по людям, порядок такой:
+
+### Приоритет 1
+
+* foundation
+* auth
+* organization hierarchy
+* projects
+* chat/message
+* ai_run skeleton
+
+### Приоритет 2
+
+* llm gateway
+* audit
+* permissions
+
+### Приоритет 3
+
+* connectors
+* sync
+* retrieval
+
+То есть сначала даём **рабочий каркас продукта**, потом даём **умный слой**, потом даём **внешний контекст**.
+
+---
+
+## 9. Правила работы backend-отдела с frontend-командой
+
+Это надо зафиксировать как обязательный процесс.
+
+### Любой новый endpoint считается готовым только если:
+
+* есть serializer
+* есть OpenAPI schema
+* согласована response shape
+* известны query params
+* есть error cases
+* фронт может добавить normalizer
+* фронт может добавить метод в `liveClient.ts`
+* фронт может пробросить это через `lib/api`
+
+Это напрямую вытекает из вашего playbook: новые сущности и endpoint’ы должны проходить через `services/api`, normalizers, контракт `ApiClient`, фасад `lib/api` и hooks, а UI не должен делать сырые HTTP-запросы. 
+
+### Общие правила
+
+* backend не меняет поля без согласования
+* backend не делает “временные костыльные” endpoint’ы мимо `/api/v1`
+* frontend не ходит в неописанные endpoint’ы
+* долгие операции только через jobs/runs
+* для AI всегда есть trace и status
+
+---
+
+## 10. Что отдать backend-отделу прямо сейчас
+
+Вот короткая формулировка задачи, которую можно отправить команде.
+
+Задача backend-отделу:
+
+Нужно начать разработку production-ready backend для ATOM AI Workspace на Django + DRF + PostgreSQL + Redis + Celery.
+
+Первый этап — не коннекторы и не сложный AI, а фундамент системы:
+
+1. поднять backend skeleton и окружения;
+2. реализовать identity, organization и hierarchy;
+3. зафиксировать API contract под текущий frontend;
+4. реализовать projects, chats, messages и ai_run skeleton.
+
+Backend должен сразу работать под существующий frontend-подход:
+
+* `/api/v1`
+* `snake_case`
+* единый pagination format
+* единый error format
+* query params `q/status/sort/page/page_size`
+* OpenAPI как источник истины
+* async jobs/runs для долгих операций
+* SSE/stream для AI-чатов
+
+Структура backend должна быть доменной:
+core, identity, organizations, orgstructure, projects, chats, ai, connectors, sync, documents, mail, issues, knowledge, llm_gateway, usage_billing, activity, audit, files.
+
+Первый deliverable:
+
+* stage environment
+* auth + me
+* organization hierarchy
+* employees/org units endpoints
+* projects endpoints
+* chats/messages endpoints
+* ai_run skeleton
+* базовый OpenAPI contract
+
+После этого переходим к llm gateway, затем к connectors/sync, затем к retrieval и citations.
+
+Если нужно, следующим сообщением я превращу это в **Jira-структуру: Epic → Story → Task**.

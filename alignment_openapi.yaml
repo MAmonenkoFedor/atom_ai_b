@@ -1,0 +1,3104 @@
+openapi: 3.0.3
+info:
+  title: ATOM AI Backend API
+  version: 1.0.0
+  description: API contract for ATOM AI Workspace
+paths:
+  /api/admin/actions/events:
+    get:
+      operationId: adminActionEventsList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
+      parameters:
+      - in: query
+        name: action
+        schema:
+          type: string
+      - in: query
+        name: actor
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: scope
+        schema:
+          type: string
+      - in: query
+        name: severity
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: to
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 103
+                        timestamp: '2026-04-15T10:20:00Z'
+                        scope: platform
+                        severity: critical
+                        status: failed
+                        action: invite_revoke
+                        actor: security@platform.com
+                        details:
+                          invite_id: 2001
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T10:10:00Z::102
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=2026-04-15T10:10:00Z::102&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 101
+                        timestamp: '2026-04-15T10:00:00Z'
+                        scope: company
+                        severity: medium
+                        status: success
+                        action: user_role_update
+                        actor: admin@company.com
+                        details:
+                          target_user_id: 13
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
+          description: ''
+  /api/admin/actions/events/{action_id}:
+    get:
+      operationId: adminActionDetail
+      parameters:
+      - in: path
+        name: action_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionEvent'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/admin/actions/stats:
+    get:
+      operationId: adminActionStats
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionStats'
+          description: ''
+  /api/admin/platform/audit/events:
+    get:
+      operationId: platformAuditEventsList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
+      parameters:
+      - in: query
+        name: action
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: severity
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: tenant_id
+        schema:
+          type: integer
+      - in: query
+        name: to
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAuditListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 3
+                        timestamp: '2026-04-15T10:20:00Z'
+                        tenant_id: 201
+                        action: tenant_status_change
+                        severity: high
+                        status: success
+                        actor_type: system
+                        message: Tenant moved to active
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T09:20:00Z::2
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=2026-04-15T09:20:00Z::2&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 1
+                        timestamp: '2026-04-15T09:00:00Z'
+                        tenant_id: 201
+                        action: invite_create
+                        severity: medium
+                        status: success
+                        actor_type: user
+                        message: Invite sent to admin@tenant-a.com
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
+          description: ''
+  /api/admin/platform/audit/export:
+    get:
+      operationId: platformAuditExport
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: 'CSV export. Content-Disposition: attachment; filename="platform-audit-YYYY-MM-DD.csv"'
+  /api/admin/platform/audit/stats:
+    get:
+      operationId: platformAuditStats
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAuditStats'
+          description: ''
+  /api/admin/platform/invites:
+    get:
+      operationId: superAdminInvitesList
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformInviteListResponse'
+          description: ''
+    post:
+      operationId: superAdminInvitesCreate
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlatformInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreatePlatformInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePlatformInviteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformInvite'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/admin/platform/invites/{invite_id}/revoke:
+    post:
+      operationId: superAdminInviteRevoke
+      parameters:
+      - in: path
+        name: invite_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformInvite'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/admin/platform/overview:
+    get:
+      operationId: superAdminOverview
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuperAdminOverview'
+          description: ''
+  /api/admin/platform/tenants:
+    get:
+      operationId: superAdminTenantsList
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantListResponse'
+          description: ''
+    post:
+      operationId: superAdminTenantsCreate
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantSummary'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/admin/platform/tenants/{tenant_id}/status:
+    patch:
+      operationId: superAdminTenantStatusUpdate
+      parameters:
+      - in: path
+        name: tenant_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTenantStatusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTenantStatusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTenantStatusRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantSummary'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/admin/platform/users:
+    get:
+      operationId: superAdminUsersList
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformUserListResponse'
+          description: ''
+  /api/auth/invite/activate:
+    post:
+      operationId: authInviteActivate
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteActivateResponse'
+          description: ''
+  /api/auth/login:
+    post:
+      operationId: authLogin
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
+  /api/auth/logout:
+    post:
+      operationId: authLogout
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: Logged out
+  /api/auth/session:
+    get:
+      operationId: authSession
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
+  /api/buildings:
+    get:
+      operationId: buildingsList
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildingListItem'
+          description: ''
+  /api/buildings/{building_id}:
+    get:
+      operationId: buildingDetail
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildingDetail'
+          description: ''
+  /api/buildings/{building_id}/departments:
+    get:
+      operationId: buildingDepartments
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+          description: ''
+  /api/buildings/{building_id}/floors/{floor_id}/employees/{employee_id}/profile:
+    get:
+      operationId: employeeProfileByFloor
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
+  /api/buildings/{building_id}/floors/{floor_id}/workspace:
+    get:
+      operationId: floorWorkspace
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+          description: ''
+  /api/buildings/{building_id}/floors/{floor_id}/workspace-context:
+    get:
+      operationId: workspaceContextAlias
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+  /api/buildings/{building_id}/floors/{floor_id}/workspace/employee/{employee_id}:
+    get:
+      operationId: employeeWorkspaceContext
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+  /api/company/admin/departments:
+    get:
+      operationId: companyAdminDepartmentsList
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompanyDepartmentSummary'
+          description: ''
+  /api/company/admin/invites:
+    get:
+      operationId: companyAdminInvitesList
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyInviteListResponse'
+          description: ''
+    post:
+      operationId: companyAdminInvitesCreate
+      tags:
+      - company
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyInviteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyInvite'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/company/admin/invites/{invite_id}/revoke:
+    post:
+      operationId: companyAdminInviteRevoke
+      parameters:
+      - in: path
+        name: invite_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyInvite'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/company/admin/overview:
+    get:
+      operationId: companyAdminOverview
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyAdminOverview'
+          description: ''
+  /api/company/admin/users:
+    get:
+      operationId: companyAdminUsersList
+      parameters:
+      - in: query
+        name: department_id
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: role
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyUserListResponse'
+          description: ''
+  /api/company/admin/users/{user_id}/role:
+    patch:
+      operationId: companyAdminUserRoleUpdate
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCompanyUserRoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCompanyUserRoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCompanyUserRoleRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyUserSummary'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/employees/{employee_id}/profile:
+    get:
+      operationId: employeeProfileGlobalAlias
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - employees
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
+  /api/projects:
+    get:
+      operationId: projects_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectList'
+          description: ''
+    post:
+      operationId: projects_create
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCreate'
+          description: ''
+  /api/projects/{id}:
+    get:
+      operationId: projects_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    patch:
+      operationId: projects_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectUpdate'
+          description: ''
+  /api/projects/{id}/archive:
+    post:
+      operationId: projectArchive
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /api/projects/{id}/members:
+    get:
+      operationId: projects_members_list
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectMemberList'
+          description: ''
+    post:
+      operationId: projects_members_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMemberCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectMemberCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectMemberCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberCreate'
+          description: ''
+  /api/projects/{id}/members/{member_id}:
+    patch:
+      operationId: projectMemberUpdate
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: member_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+          description: ''
+    delete:
+      operationId: projectMemberDelete
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: member_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: Project member deleted
+  /api/projects/{id}/restore:
+    post:
+      operationId: projectRestore
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /api/tasks:
+    get:
+      operationId: tasksList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
+      parameters:
+      - in: query
+        name: assignee_id
+        schema:
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: department_id
+        schema:
+          type: integer
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: priority
+        schema:
+          type: string
+      - in: query
+        name: project_id
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: sort
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks?cursor=&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:21:49.573218Z::2004
+                      results:
+                      - id: 2005
+                        title: Cursor smoke 0
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks?cursor=2026-04-15T12:21:49.573218Z::2004&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T10:00:00Z::2002
+                      results:
+                      - id: 2004
+                        title: Cursor smoke 1
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: Second cursor page
+          description: ''
+    post:
+      operationId: tasksCreate
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/tasks/{task_id}:
+    get:
+      operationId: taskDetail
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+    patch:
+      operationId: taskUpdate
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTaskRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTaskRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTaskRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+    delete:
+      operationId: taskDelete
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: Task deleted
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/tasks/{task_id}/activity:
+    get:
+      operationId: taskActivityList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskActivityListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:23:54.103397Z::2
+                      results:
+                      - id: 3
+                        task_id: 2003
+                        event_type: updated
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          changed_fields:
+                            status:
+                              from: todo
+                              to: in_progress
+                        created_at: '2026-04-15T12:23:54.103397Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=2026-04-15T12:23:54.103397Z::2&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: null
+                      results:
+                      - id: 1
+                        task_id: 2003
+                        event_type: created
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          status: todo
+                          priority: medium
+                          assignee_id: 12
+                        created_at: '2026-04-15T12:23:54.100000Z'
+                  summary: Second cursor page
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/tasks/board:
+    get:
+      operationId: tasksBoard
+      parameters:
+      - in: query
+        name: assignee_id
+        schema:
+          type: integer
+      - in: query
+        name: department_id
+        schema:
+          type: integer
+      - in: query
+        name: priority
+        schema:
+          type: string
+      - in: query
+        name: project_id
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskBoardResponse'
+          description: ''
+  /api/tasks/bulk/assign:
+    patch:
+      operationId: tasksBulkAssign
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskAssignRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskAssignRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskAssignRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkTaskUpdateResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/tasks/bulk/status:
+    patch:
+      operationId: tasksBulkStatusUpdate
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskStatusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskStatusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBulkTaskStatusRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkTaskUpdateResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+  /api/tasks/stats:
+    get:
+      operationId: tasksStats
+      tags:
+      - tasks
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStats'
+          description: ''
+  /api/workspace/context:
+    get:
+      operationId: workspaceContextGlobalAlias
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+components:
+  schemas:
+    Activity:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        timestamp:
+          type: string
+      required:
+      - id
+      - timestamp
+      - title
+      - type
+    ActorTypeEnum:
+      enum:
+      - user
+      - system
+      - integration
+      type: string
+      description: |-
+        * `user` - user
+        * `system` - system
+        * `integration` - integration
+    AdminActionEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        scope:
+          $ref: '#/components/schemas/ScopeEnum'
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        status:
+          $ref: '#/components/schemas/RequestStatusEnum'
+        action:
+          type: string
+        actor:
+          type: string
+        details:
+          type: object
+          additionalProperties: {}
+      required:
+      - action
+      - actor
+      - details
+      - id
+      - scope
+      - severity
+      - status
+      - timestamp
+    AdminActionListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminActionEvent'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - count
+      - next_cursor
+      - page
+      - page_size
+      - results
+    AdminActionStats:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        failed_events:
+          type: integer
+        critical_events:
+          type: integer
+      required:
+      - critical_events
+      - failed_events
+      - total_events
+    AuthLogin:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+      - password
+    BuildingDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+      required:
+      - departments
+      - id
+      - name
+    BuildingListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        floors:
+          type: integer
+        employees:
+          type: integer
+        online_now:
+          type: integer
+        risky_tasks:
+          type: integer
+        overdue_tasks:
+          type: integer
+        color:
+          type: string
+        height_ratio:
+          type: number
+          format: double
+        latest_event:
+          type: string
+        logo:
+          type: string
+      required:
+      - color
+      - employees
+      - floors
+      - height_ratio
+      - id
+      - latest_event
+      - logo
+      - name
+      - online_now
+      - overdue_tasks
+      - risky_tasks
+      - status
+    BulkTaskUpdateResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+        not_found_ids:
+          type: array
+          items:
+            type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required:
+      - not_found_ids
+      - results
+      - updated
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        author:
+          type: string
+        text:
+          type: string
+        created_at:
+          type: string
+      required:
+      - author
+      - created_at
+      - id
+      - text
+    CompanyAdminOverview:
+      type: object
+      properties:
+        users_count:
+          type: integer
+        departments_count:
+          type: integer
+        invites_pending:
+          type: integer
+      required:
+      - departments_count
+      - invites_pending
+      - users_count
+    CompanyDepartmentSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/CompanyDepartmentSummaryStatusEnum'
+      required:
+      - id
+      - name
+      - status
+    CompanyDepartmentSummaryStatusEnum:
+      enum:
+      - green
+      - yellow
+      - red
+      type: string
+      description: |-
+        * `green` - green
+        * `yellow` - yellow
+        * `red` - red
+    CompanyInvite:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
+        status:
+          $ref: '#/components/schemas/InviteStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - email
+      - id
+      - role
+      - status
+    CompanyInviteListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyInvite'
+      required:
+      - count
+      - results
+    CompanyUserListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyUserSummary'
+      required:
+      - count
+      - results
+    CompanyUserRoleEnum:
+      enum:
+      - employee
+      - manager
+      - company_admin
+      type: string
+      description: |-
+        * `employee` - employee
+        * `manager` - manager
+        * `company_admin` - company_admin
+    CompanyUserStatusEnum:
+      enum:
+      - active
+      - invited
+      - blocked
+      type: string
+      description: |-
+        * `active` - active
+        * `invited` - invited
+        * `blocked` - blocked
+    CompanyUserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
+        status:
+          $ref: '#/components/schemas/CompanyUserStatusEnum'
+        department_id:
+          type: integer
+      required:
+      - department_id
+      - email
+      - id
+      - name
+      - role
+      - status
+    CreateCompanyInviteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          allOf:
+          - $ref: '#/components/schemas/CompanyUserRoleEnum'
+          default: employee
+      required:
+      - email
+    CreatePlatformInviteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          allOf:
+          - $ref: '#/components/schemas/PlatformRoleEnum'
+          default: support
+      required:
+      - email
+    CreateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          default: ''
+        status:
+          allOf:
+          - $ref: '#/components/schemas/TaskStatusEnum'
+          default: todo
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          default: medium
+        project_id:
+          type: integer
+          nullable: true
+        assignee_id:
+          type: integer
+        department_id:
+          type: integer
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assignee_id
+      - title
+    CreateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+      - name
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+        floor:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+        employee_count:
+          type: integer
+        online_count:
+          type: integer
+        risky_tasks:
+          type: integer
+        overdue_tasks:
+          type: integer
+        lead:
+          type: string
+      required:
+      - employee_count
+      - floor
+      - id
+      - lead
+      - name
+      - online_count
+      - overdue_tasks
+      - risky_tasks
+      - status
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        updated_at:
+          type: string
+        owner:
+          type: string
+      required:
+      - id
+      - owner
+      - title
+      - type
+      - updated_at
+    Employee:
+      type: object
+      properties:
+        id:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+        avatar:
+          type: string
+        status:
+          type: string
+        email:
+          type: string
+        telegram:
+          type: string
+        timezone:
+          type: string
+        hours:
+          type: string
+        x:
+          type: integer
+        y:
+          type: integer
+        points:
+          type: integer
+        next_goal:
+          type: integer
+        next_goal_label:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceTask'
+      required:
+      - avatar
+      - email
+      - full_name
+      - hours
+      - id
+      - next_goal
+      - next_goal_label
+      - points
+      - role
+      - status
+      - tasks
+      - telegram
+      - timezone
+      - x
+      - y
+    EmployeeProfile:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/Employee'
+        building_name:
+          type: string
+        department:
+          type: string
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceProject'
+        activity_feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        comments_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        performance:
+          $ref: '#/components/schemas/Performance'
+      required:
+      - activity_feed
+      - building_name
+      - comments_history
+      - department
+      - employee
+      - performance
+      - projects
+    EmployeeWorkspaceContext:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/Employee'
+        my_tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceTask'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        activity_feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        project_context:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceProject'
+      required:
+      - activity_feed
+      - documents
+      - employee
+      - my_tasks
+      - project_context
+    ErrorDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    InviteActivate:
+      type: object
+      properties:
+        invite_token:
+          type: string
+        token:
+          type: string
+        password:
+          type: string
+    InviteActivateResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        invite_token:
+          type: string
+      required:
+      - detail
+      - invite_token
+    InviteStatusEnum:
+      enum:
+      - pending
+      - accepted
+      - expired
+      - revoked
+      type: string
+      description: |-
+        * `pending` - pending
+        * `accepted` - accepted
+        * `expired` - expired
+        * `revoked` - revoked
+    PaginatedProjectList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+    PaginatedProjectMemberList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectMember'
+    PatchedBulkTaskAssignRequest:
+      type: object
+      properties:
+        task_ids:
+          type: array
+          items:
+            type: integer
+        assignee_id:
+          type: integer
+    PatchedBulkTaskStatusRequest:
+      type: object
+      properties:
+        task_ids:
+          type: array
+          items:
+            type: integer
+        status:
+          $ref: '#/components/schemas/TaskStatusEnum'
+    PatchedProjectMemberUpdate:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+        is_active:
+          type: boolean
+    PatchedProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+    PatchedUpdateCompanyUserRoleRequest:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
+    PatchedUpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        project_id:
+          type: integer
+          nullable: true
+        assignee_id:
+          type: integer
+        department_id:
+          type: integer
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+    PatchedUpdateTenantStatusRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/TenantStatusEnum'
+    Performance:
+      type: object
+      properties:
+        completed_tasks:
+          type: integer
+        total_tasks:
+          type: integer
+        on_time_rate:
+          type: integer
+        response_rate:
+          type: integer
+      required:
+      - completed_tasks
+      - on_time_rate
+      - response_rate
+      - total_tasks
+    PlatformAuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        tenant_id:
+          type: integer
+        action:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        status:
+          $ref: '#/components/schemas/RequestStatusEnum'
+        actor_type:
+          $ref: '#/components/schemas/ActorTypeEnum'
+        message:
+          type: string
+      required:
+      - action
+      - actor_type
+      - id
+      - message
+      - severity
+      - status
+      - tenant_id
+      - timestamp
+    PlatformAuditListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformAuditEvent'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - count
+      - next_cursor
+      - page
+      - page_size
+      - results
+    PlatformAuditStats:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        failed_events:
+          type: integer
+        critical_events:
+          type: integer
+      required:
+      - critical_events
+      - failed_events
+      - total_events
+    PlatformInvite:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/PlatformRoleEnum'
+        status:
+          $ref: '#/components/schemas/InviteStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - email
+      - id
+      - role
+      - status
+    PlatformInviteListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformInvite'
+      required:
+      - count
+      - results
+    PlatformRoleEnum:
+      enum:
+      - platform_admin
+      - support
+      - security
+      type: string
+      description: |-
+        * `platform_admin` - platform_admin
+        * `support` - support
+        * `security` - security
+    PlatformUserListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformUserSummary'
+      required:
+      - count
+      - results
+    PlatformUserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/PlatformRoleEnum'
+      required:
+      - email
+      - id
+      - name
+      - role
+    PriorityEnum:
+      enum:
+      - high
+      - medium
+      - low
+      type: string
+      description: |-
+        * `high` - high
+        * `medium` - medium
+        * `low` - low
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        organization_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+        created_by_id:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by_id
+      - id
+      - name
+      - organization_id
+      - updated_at
+    ProjectCreate:
+      type: object
+      properties:
+        organization:
+          type: integer
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+      required:
+      - name
+      - organization
+    ProjectMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+        user_id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        role:
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+        is_active:
+          type: boolean
+        joined_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - email
+      - first_name
+      - id
+      - joined_at
+      - last_name
+      - project
+      - user_id
+      - username
+    ProjectMemberCreate:
+      type: object
+      properties:
+        user:
+          type: integer
+        role:
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+        is_active:
+          type: boolean
+      required:
+      - user
+    ProjectMemberRoleEnum:
+      enum:
+      - owner
+      - editor
+      - viewer
+      type: string
+      description: |-
+        * `owner` - Owner
+        * `editor` - Editor
+        * `viewer` - Viewer
+    ProjectStatusEnum:
+      enum:
+      - active
+      - on_hold
+      - completed
+      - archived
+      type: string
+      description: |-
+        * `active` - Active
+        * `on_hold` - On Hold
+        * `completed` - Completed
+        * `archived` - Archived
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+      required:
+      - name
+    RequestStatusEnum:
+      enum:
+      - success
+      - failed
+      type: string
+      description: |-
+        * `success` - success
+        * `failed` - failed
+    ScopeEnum:
+      enum:
+      - company
+      - platform
+      type: string
+      description: |-
+        * `company` - company
+        * `platform` - platform
+    SessionPayload:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/SessionUser'
+      required:
+      - token
+      - user
+    SessionResponse:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/SessionPayload'
+      required:
+      - session
+    SessionUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Адрес электронной почты
+          maxLength: 254
+        role:
+          type: string
+          readOnly: true
+        department:
+          type: string
+          readOnly: true
+      required:
+      - department
+      - id
+      - name
+      - role
+    SeverityEnum:
+      enum:
+      - low
+      - medium
+      - high
+      - critical
+      type: string
+      description: |-
+        * `low` - low
+        * `medium` - medium
+        * `high` - high
+        * `critical` - critical
+    SuperAdminOverview:
+      type: object
+      properties:
+        tenants_count:
+          type: integer
+        platform_users_count:
+          type: integer
+        invites_pending:
+          type: integer
+      required:
+      - invites_pending
+      - platform_users_count
+      - tenants_count
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        project_id:
+          type: integer
+          nullable: true
+        assignee_id:
+          type: integer
+        department_id:
+          type: integer
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - assignee_id
+      - created_at
+      - department_id
+      - description
+      - due_date
+      - id
+      - priority
+      - project_id
+      - status
+      - title
+      - updated_at
+    TaskActivityEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        event_type:
+          type: string
+        actor_id:
+          type: integer
+          nullable: true
+        actor_username:
+          type: string
+        payload:
+          type: object
+          additionalProperties: {}
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - actor_id
+      - actor_username
+      - created_at
+      - event_type
+      - id
+      - payload
+      - task_id
+    TaskActivityListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        num_pages:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskActivityEvent'
+      required:
+      - count
+      - next_cursor
+      - num_pages
+      - page
+      - page_size
+      - results
+    TaskBoardResponse:
+      type: object
+      properties:
+        todo:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        in_progress:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        done:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required:
+      - done
+      - in_progress
+      - todo
+    TaskListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        num_pages:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required:
+      - count
+      - next_cursor
+      - num_pages
+      - page
+      - page_size
+      - results
+    TaskStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        todo:
+          type: integer
+        in_progress:
+          type: integer
+        done:
+          type: integer
+        high_priority:
+          type: integer
+        medium_priority:
+          type: integer
+        low_priority:
+          type: integer
+      required:
+      - done
+      - high_priority
+      - in_progress
+      - low_priority
+      - medium_priority
+      - todo
+      - total
+    TaskStatusEnum:
+      enum:
+      - todo
+      - in_progress
+      - done
+      type: string
+      description: |-
+        * `todo` - todo
+        * `in_progress` - in_progress
+        * `done` - done
+    TenantListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantSummary'
+      required:
+      - count
+      - results
+    TenantStatusEnum:
+      enum:
+      - active
+      - trial
+      - suspended
+      type: string
+      description: |-
+        * `active` - active
+        * `trial` - trial
+        * `suspended` - suspended
+    TenantSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/TenantStatusEnum'
+      required:
+      - id
+      - name
+      - status
+    Workspace:
+      type: object
+      properties:
+        building_name:
+          type: string
+        department:
+          type: string
+        zones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Zone'
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+      required:
+      - building_name
+      - department
+      - employees
+      - zones
+    WorkspaceProject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        summary:
+          type: string
+      required:
+      - id
+      - name
+      - status
+      - summary
+    WorkspaceTask:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        column:
+          type: string
+        priority:
+          type: string
+        due:
+          type: string
+      required:
+      - column
+      - due
+      - id
+      - priority
+      - title
+    Zone:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+        w:
+          type: integer
+        h:
+          type: integer
+        label:
+          type: string
+        color:
+          type: string
+        stroke_color:
+          type: string
+      required:
+      - color
+      - h
+      - label
+      - stroke_color
+      - w
+      - x
+      - y
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
