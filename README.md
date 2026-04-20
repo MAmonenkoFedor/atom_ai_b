@@ -75,3 +75,12 @@ celery -A config worker -l info
   - `LLM_GATEWAY_TIMEOUT_MS`
   - `LLM_GATEWAY_MAX_RETRIES`
   - `LLM_GATEWAY_ENABLE_FALLBACK`
+
+## 6) Frontend live integration
+
+- Frontend live connection guide:
+  - `FRONTEND_LIVE_CONNECTION_GUIDE.md`
+- Canonical backend contract:
+  - `BACKEND_HANDOFF.md`
+- Employee vertical packet:
+  - `EMPLOYEE_BACKEND_PACKET.md`

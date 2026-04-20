@@ -1,5 +1,7 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.db.models import Q
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
@@ -18,6 +20,16 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+class AuthCsrfCookieView(APIView):
+    """Prime `csrftoken` cookie for SPA login (cross-origin POST /auth/login)."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({"detail": "ok"})
 
 
 class MeView(APIView):

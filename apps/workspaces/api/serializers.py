@@ -142,8 +142,39 @@ class FlexibleObjectSerializer(serializers.Serializer):
         ref_name = "WorkspaceFlexibleObject"
 
 
+class EmployeeHeaderSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    full_name = serializers.CharField()
+    role = serializers.CharField()
+    title = serializers.CharField()
+    avatar = serializers.CharField()
+    department = serializers.CharField()
+    status = serializers.CharField()
+    role_source_of_truth = serializers.CharField(required=False)
+
+
+class ContractMetaSerializer(serializers.Serializer):
+    encoding = serializers.CharField()
+    locale = serializers.CharField()
+    timestamp_format = serializers.CharField()
+    header_role_source_of_truth = serializers.CharField()
+
+
+class EmployeeCabinetSummarySerializer(serializers.Serializer):
+    id = serializers.CharField()
+    full_name = serializers.CharField()
+    role = serializers.CharField()
+    title = serializers.CharField()
+    avatar = serializers.CharField()
+    status = serializers.CharField()
+    email = serializers.CharField()
+    telegram = serializers.CharField()
+    timezone = serializers.CharField()
+    hours = serializers.CharField()
+
+
 class WorkspaceEmployeeCabinetSerializer(serializers.Serializer):
-    employee = serializers.JSONField()
+    employee = EmployeeCabinetSummarySerializer()
     greeting = serializers.JSONField()
     today_focus = serializers.JSONField()
     quick_actions = serializers.JSONField()
@@ -154,11 +185,12 @@ class WorkspaceEmployeeCabinetSerializer(serializers.Serializer):
     ai_context = serializers.JSONField()
     role_extras = serializers.JSONField(required=False)
     viewer_role = serializers.CharField()
+    contract_meta = ContractMetaSerializer(required=False)
 
 
 class EmployeeOwnerProfileSerializer(serializers.Serializer):
     view = serializers.CharField()
-    header = serializers.JSONField()
+    header = EmployeeHeaderSerializer()
     contacts = serializers.JSONField()
     performance = serializers.JSONField()
     projects = serializers.JSONField()
@@ -172,7 +204,7 @@ class EmployeeOwnerProfileSerializer(serializers.Serializer):
 
 class EmployeePublicProfileSerializer(serializers.Serializer):
     view = serializers.CharField()
-    header = serializers.JSONField()
+    header = EmployeeHeaderSerializer()
     contacts = serializers.JSONField()
     public_projects = serializers.JSONField()
     public_achievements = serializers.JSONField()
@@ -200,3 +232,20 @@ class QuickTaskCreateResponseSerializer(serializers.Serializer):
     task_id = serializers.CharField()
     slot = serializers.CharField()
     title = serializers.CharField()
+
+
+class WorkspaceTaskAliasCreateSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    column = serializers.ChoiceField(choices=["todo", "in_progress", "done"], required=False)
+    status = serializers.ChoiceField(choices=["todo", "in_progress", "done"], required=False)
+    priority = serializers.ChoiceField(choices=["high", "medium", "low"], required=False)
+    due = serializers.CharField(required=False)
+    project_id = serializers.CharField(required=False)
+
+
+class WorkspaceTaskAliasPatchSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False)
+    column = serializers.ChoiceField(choices=["todo", "in_progress", "done"], required=False)
+    status = serializers.ChoiceField(choices=["todo", "in_progress", "done"], required=False)
+    priority = serializers.ChoiceField(choices=["high", "medium", "low"], required=False)
+    due = serializers.CharField(required=False, allow_null=True)

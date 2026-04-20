@@ -1,4 +1,4 @@
-﻿﻿# Backend Handoff
+﻿# Backend Handoff
 
 Дата: 2026-04-17
 Статус: canonical backend handoff
@@ -15,11 +15,13 @@
 - обязательные schema domains и integration rules;
 - минимальный набор runtime expectations для live-интеграции.
 
+Рабочий регламент синка frontend/backend (формат изменений, сигнал готовности endpoint, процесс smoke) зафиксирован в:
+- `docs/backend/FRONTEND_BACKEND_SYNC_PROTOCOL.md`
+
 Правило пакета документации:
 - `docs/backend/BACKEND_HANDOFF.md` — канонический API contract;
 - mini-spec в `docs/product/*` обязаны соответствовать этому документу;
 - любые contract changes сначала вносятся сюда и в OpenAPI, потом в mini-spec и frontend.
-- протокол синхронизации изменений: `docs/backend/FRONTEND_BACKEND_SYNC_PROTOCOL.md`.
 
 ## 2. Integration rules
 
@@ -396,7 +398,7 @@ Backend team can start with:
    - `GET /api/employees/{employee_id}` (owner/public split)
    - `PATCH /api/employees/me`
    - `POST /api/workspace/quick-tasks`
-2. Follow task-ready plan from `docs/backend/EMPLOYEE_BACKEND_WORKSTREAM.md`.
+2. Follow current backend priorities in `docs/backend/BACKEND_REQUESTS_NOW.md`.
 3. Publish `/schema/`, Swagger and ReDoc for implemented endpoints.
 4. Provide minimal dev seed data for colleague/public-profile checks.
 5. Delivery checklist:

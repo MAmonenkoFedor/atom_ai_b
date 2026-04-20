@@ -1,6 +1,12 @@
 from django.urls import path
 
-from apps.identity.api.views import AuthLoginView, AuthLogoutView, AuthSessionView, InviteActivateView
+from apps.identity.api.views import (
+    AuthCsrfCookieView,
+    AuthLoginView,
+    AuthLogoutView,
+    AuthSessionView,
+    InviteActivateView,
+)
 from apps.projects.api.views import (
     ProjectArchiveView,
     ProjectDetailView,
@@ -20,6 +26,8 @@ from apps.workspaces.api.views import (
     EmployeeWorkspaceCabinetView,
     EmployeeWorkspaceContextView,
     FloorWorkspaceView,
+    WorkspaceTaskAliasDetailView,
+    WorkspaceTasksAliasView,
     WorkspaceQuickTasksView,
     WorkspaceContextAliasView,
     WorkspaceContextGlobalAliasView,
@@ -54,6 +62,7 @@ from .parallel_contract_views import (
 )
 
 urlpatterns = [
+    path("auth/csrf", AuthCsrfCookieView.as_view()),
     path("auth/login", AuthLoginView.as_view()),
     path("auth/logout", AuthLogoutView.as_view()),
     path("auth/session", AuthSessionView.as_view()),
@@ -77,6 +86,8 @@ urlpatterns = [
     path("workspace/context", WorkspaceContextGlobalAliasView.as_view()),
     path("employees/<str:employee_id>/profile", EmployeeProfileGlobalAliasView.as_view()),
     path("workspace", EmployeeWorkspaceCabinetView.as_view()),
+    path("workspace/tasks", WorkspaceTasksAliasView.as_view()),
+    path("workspace/tasks/<str:task_id>", WorkspaceTaskAliasDetailView.as_view()),
     path("employees/me", EmployeeMeProfileView.as_view()),
     path("employees/<str:employee_id>", EmployeeProfileByIdView.as_view()),
     path("workspace/quick-tasks", WorkspaceQuickTasksView.as_view()),

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AuthCsrfCookieView,
     AuthLoginView,
     AuthLogoutView,
     AuthSessionView,
@@ -11,6 +12,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("auth/csrf", AuthCsrfCookieView.as_view(), name="auth-csrf-cookie"),
     path("me", MeView.as_view(), name="me"),
     path("employees", EmployeeListView.as_view(), name="employees-list"),
     path("employees/<int:pk>", EmployeeDetailView.as_view(), name="employees-detail"),

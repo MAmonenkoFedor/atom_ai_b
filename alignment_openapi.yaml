@@ -941,7 +941,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmployeeOwnerProfile'
+                $ref: '#/components/schemas/EmployeeProfileOwnerOrPublicResponse'
           description: ''
   /api/employees/{employee_id}/profile:
     get:
@@ -1837,6 +1837,185 @@ paths:
               schema:
                 $ref: '#/components/schemas/QuickTaskCreateResponse'
           description: ''
+  /api/workspace/tasks:
+    get:
+      operationId: workspaceTasksAliasList
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: column
+        schema:
+          type: string
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: priority
+        schema:
+          type: string
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkspaceTask'
+          description: ''
+    post:
+      operationId: workspaceTasksAliasCreate
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskAliasCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskAliasCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskAliasCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceTask'
+          description: ''
+  /api/workspace/tasks/{task_id}:
+    get:
+      operationId: workspaceTaskAliasDetail
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceTask'
+          description: ''
+    patch:
+      operationId: workspaceTaskAliasPatch
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskAliasPatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskAliasPatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskAliasPatch'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceTask'
+          description: ''
+    delete:
+      operationId: workspaceTaskAliasDelete
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
     Activity:
@@ -2155,6 +2334,22 @@ components:
       - name
       - role
       - status
+    ContractMeta:
+      type: object
+      properties:
+        encoding:
+          type: string
+        locale:
+          type: string
+        timestamp_format:
+          type: string
+        header_role_source_of_truth:
+          type: string
+      required:
+      - encoding
+      - header_role_source_of_truth
+      - locale
+      - timestamp_format
     CreateCompanyInviteRequest:
       type: object
       properties:
@@ -2318,12 +2513,74 @@ components:
       - timezone
       - x
       - y
+    EmployeeCabinetSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+        title:
+          type: string
+        avatar:
+          type: string
+        status:
+          type: string
+        email:
+          type: string
+        telegram:
+          type: string
+        timezone:
+          type: string
+        hours:
+          type: string
+      required:
+      - avatar
+      - email
+      - full_name
+      - hours
+      - id
+      - role
+      - status
+      - telegram
+      - timezone
+      - title
+    EmployeeHeader:
+      type: object
+      properties:
+        id:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+        title:
+          type: string
+        avatar:
+          type: string
+        department:
+          type: string
+        status:
+          type: string
+        role_source_of_truth:
+          type: string
+      required:
+      - avatar
+      - department
+      - full_name
+      - id
+      - role
+      - status
+      - title
     EmployeeOwnerProfile:
       type: object
       properties:
         view:
           type: string
-        header: {}
+        header:
+          $ref: '#/components/schemas/EmployeeHeader'
         contacts: {}
         performance: {}
         projects: {}
@@ -2376,6 +2633,32 @@ components:
       - employee
       - performance
       - projects
+    EmployeeProfileOwnerOrPublicResponse:
+      oneOf:
+      - $ref: '#/components/schemas/EmployeeOwnerProfile'
+      - $ref: '#/components/schemas/EmployeePublicProfile'
+      discriminator:
+        propertyName: view
+        mapping:
+          None: '#/components/schemas/EmployeePublicProfile'
+    EmployeePublicProfile:
+      type: object
+      properties:
+        view:
+          type: string
+        header:
+          $ref: '#/components/schemas/EmployeeHeader'
+        contacts: {}
+        public_projects: {}
+        public_achievements: {}
+        public_stats: {}
+      required:
+      - contacts
+      - header
+      - public_achievements
+      - public_projects
+      - public_stats
+      - view
     EmployeeWorkspaceContext:
       type: object
       properties:
@@ -2574,6 +2857,20 @@ components:
       properties:
         status:
           $ref: '#/components/schemas/TenantStatusEnum'
+    PatchedWorkspaceTaskAliasPatch:
+      type: object
+      properties:
+        title:
+          type: string
+        column:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        status:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        due:
+          type: string
+          nullable: true
     Performance:
       type: object
       properties:
@@ -3223,7 +3520,8 @@ components:
     WorkspaceEmployeeCabinet:
       type: object
       properties:
-        employee: {}
+        employee:
+          $ref: '#/components/schemas/EmployeeCabinetSummary'
         greeting: {}
         today_focus: {}
         quick_actions: {}
@@ -3235,6 +3533,8 @@ components:
         role_extras: {}
         viewer_role:
           type: string
+        contract_meta:
+          $ref: '#/components/schemas/ContractMeta'
       required:
       - activity_feed
       - ai_context
@@ -3280,6 +3580,23 @@ components:
       - due
       - id
       - priority
+      - title
+    WorkspaceTaskAliasCreate:
+      type: object
+      properties:
+        title:
+          type: string
+        column:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        status:
+          $ref: '#/components/schemas/TaskStatusEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        due:
+          type: string
+        project_id:
+          type: string
+      required:
       - title
     Zone:
       type: object

@@ -1,6 +1,6 @@
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, PolymorphicProxySerializer, extend_schema
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -16,6 +16,9 @@ from .serializers import (
     EmployeeOwnerProfileSerializer,
     EmployeePublicProfileSerializer,
     EmployeeWorkspaceContextSerializer,
+    TaskSerializer,
+    WorkspaceTaskAliasCreateSerializer,
+    WorkspaceTaskAliasPatchSerializer,
     QuickTaskCreateResponseSerializer,
     QuickTaskCreateSerializer,
     UpdateMyEmployeeProfileSerializer,
@@ -215,7 +218,13 @@ class EmployeeProfileByIdView(APIView):
 
     @extend_schema(
         operation_id="employeeProfileOwnerOrPublic",
-        responses={200: EmployeeOwnerProfileSerializer},
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="EmployeeProfileOwnerOrPublicResponse",
+                serializers=[EmployeeOwnerProfileSerializer, EmployeePublicProfileSerializer],
+                resource_type_field_name="view",
+            )
+        },
     )
     def get(self, request, employee_id: str):
         own_employee_id = data.resolve_employee_id_for_username(request.user.username)
@@ -246,3 +255,107 @@ class WorkspaceQuickTasksView(APIView):
             project_id=serializer.validated_data.get("project_id"),
         )
         return Response(QuickTaskCreateResponseSerializer(payload).data, status=201)
+
+
+def _require_workspace_scope_query(request):
+    building_id = request.query_params.get("building_id")
+    floor_id = request.query_params.get("floor_id")
+    if not building_id or not floor_id:
+        raise ValidationError({"detail": "building_id and floor_id query params are required."})
+    return str(building_id), str(floor_id)
+
+
+class WorkspaceTasksAliasView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="workspaceTasksAliasList",
+        parameters=[
+            OpenApiParameter("building_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("floor_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("q", OpenApiTypes.STR),
+            OpenApiParameter("column", OpenApiTypes.STR),
+            OpenApiParameter("status", OpenApiTypes.STR),
+            OpenApiParameter("priority", OpenApiTypes.STR),
+        ],
+        responses=TaskSerializer(many=True),
+    )
+    def get(self, request):
+        _require_workspace_scope_query(request)
+        employee_id = data.resolve_employee_id_for_username(request.user.username)
+        payload = data.list_workspace_tasks(
+            employee_id,
+            {
+                "q": request.query_params.get("q"),
+                "column": request.query_params.get("column"),
+                "status": request.query_params.get("status"),
+                "priority": request.query_params.get("priority"),
+            },
+        )
+        return Response(TaskSerializer(payload, many=True).data)
+
+    @extend_schema(
+        operation_id="workspaceTasksAliasCreate",
+        parameters=[
+            OpenApiParameter("building_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("floor_id", OpenApiTypes.STR, required=True),
+        ],
+        request=WorkspaceTaskAliasCreateSerializer,
+        responses=TaskSerializer,
+    )
+    def post(self, request):
+        _require_workspace_scope_query(request)
+        serializer = WorkspaceTaskAliasCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee_id = data.resolve_employee_id_for_username(request.user.username)
+        payload = data.create_workspace_task(employee_id, serializer.validated_data)
+        return Response(TaskSerializer(payload).data, status=201)
+
+
+class WorkspaceTaskAliasDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="workspaceTaskAliasDetail",
+        parameters=[
+            OpenApiParameter("building_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("floor_id", OpenApiTypes.STR, required=True),
+        ],
+        responses=TaskSerializer,
+    )
+    def get(self, request, task_id: str):
+        _require_workspace_scope_query(request)
+        employee_id = data.resolve_employee_id_for_username(request.user.username)
+        payload = data.get_workspace_task(employee_id, task_id)
+        return Response(TaskSerializer(payload).data)
+
+    @extend_schema(
+        operation_id="workspaceTaskAliasPatch",
+        parameters=[
+            OpenApiParameter("building_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("floor_id", OpenApiTypes.STR, required=True),
+        ],
+        request=WorkspaceTaskAliasPatchSerializer,
+        responses=TaskSerializer,
+    )
+    def patch(self, request, task_id: str):
+        _require_workspace_scope_query(request)
+        serializer = WorkspaceTaskAliasPatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee_id = data.resolve_employee_id_for_username(request.user.username)
+        payload = data.patch_workspace_task(employee_id, task_id, serializer.validated_data)
+        return Response(TaskSerializer(payload).data)
+
+    @extend_schema(
+        operation_id="workspaceTaskAliasDelete",
+        parameters=[
+            OpenApiParameter("building_id", OpenApiTypes.STR, required=True),
+            OpenApiParameter("floor_id", OpenApiTypes.STR, required=True),
+        ],
+        responses={204: None},
+    )
+    def delete(self, request, task_id: str):
+        _require_workspace_scope_query(request)
+        employee_id = data.resolve_employee_id_for_username(request.user.username)
+        data.delete_workspace_task(employee_id, task_id)
+        return Response(status=204)

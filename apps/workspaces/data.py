@@ -2,7 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from itertools import count
 
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 
 BUILDINGS = [
     {
@@ -74,7 +74,7 @@ FLOOR_WORKSPACES = {
                         "title": "KPI report",
                         "column": "in_progress",
                         "priority": "high",
-                        "due": "2026-04-20",
+                        "due": "2026-04-20T00:00:00Z",
                     }
                 ],
             }
@@ -90,7 +90,7 @@ EMPLOYEE_CONTEXT = {
                 "title": "KPI report",
                 "column": "in_progress",
                 "priority": "high",
-                "due": "2026-04-20",
+                "due": "2026-04-20T00:00:00Z",
             }
         ],
         "documents": [
@@ -98,7 +98,7 @@ EMPLOYEE_CONTEXT = {
                 "id": "doc-1",
                 "title": "Marketing roadmap Q2",
                 "type": "doc",
-                "updated_at": "2026-04-14T10:42:00+03:00",
+                "updated_at": "2026-04-14T07:42:00Z",
                 "owner": "Alex K",
             }
         ],
@@ -107,7 +107,7 @@ EMPLOYEE_CONTEXT = {
                 "id": "act-1",
                 "type": "task",
                 "title": "Task updated",
-                "timestamp": "2026-04-14T11:10:00+03:00",
+                "timestamp": "2026-04-14T08:10:00Z",
             }
         ],
         "project_context": [
@@ -136,7 +136,7 @@ EMPLOYEE_PROFILE_EXTRA = {
                 "id": "act-1",
                 "type": "task",
                 "title": "Task updated",
-                "timestamp": "2026-04-14T11:10:00+03:00",
+                "timestamp": "2026-04-14T08:10:00Z",
             }
         ],
         "comments_history": [
@@ -144,7 +144,7 @@ EMPLOYEE_PROFILE_EXTRA = {
                 "id": "cmt-1",
                 "author": "Alex K",
                 "text": "Need KPI update",
-                "created_at": "2026-04-14T10:10:00+03:00",
+                "created_at": "2026-04-14T07:10:00Z",
             }
         ],
         "performance": {
@@ -161,6 +161,7 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
         "header": {
             "id": "emp-1",
             "full_name": "Alex Kim",
+            "role": "employee",
             "title": "Marketing Lead",
             "avatar": "https://cdn.atom.ai/assets/avatars/emp-1.png",
             "department": "Marketing",
@@ -218,6 +219,7 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
         "header": {
             "id": "emp-2",
             "full_name": "Maria Smirnova",
+            "role": "manager",
             "title": "Marketing Manager",
             "avatar": "https://cdn.atom.ai/assets/avatars/emp-2.png",
             "department": "Marketing",
@@ -259,6 +261,7 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
         "header": {
             "id": "emp-3",
             "full_name": "Company Admin",
+            "role": "company_admin",
             "title": "Company Admin",
             "avatar": "https://cdn.atom.ai/assets/avatars/emp-3.png",
             "department": "Administration",
@@ -307,19 +310,19 @@ USERNAME_TO_EMPLOYEE = {
 EMPLOYEE_VERTICAL_TASKS = {
     "emp-1": {
         "overdue": [
-            {"id": "t-over-1", "title": "Finish KPI deck", "column": "todo", "priority": "high", "due": "2026-04-10"}
+            {"id": "t-over-1", "title": "Finish KPI deck", "column": "todo", "priority": "high", "due": "2026-04-10T00:00:00Z"}
         ],
         "today": [
-            {"id": "t-today-1", "title": "Review campaign stats", "column": "in_progress", "priority": "medium", "due": "2026-04-17"}
+            {"id": "t-today-1", "title": "Review campaign stats", "column": "in_progress", "priority": "medium", "due": "2026-04-17T00:00:00Z"}
         ],
         "this_week": [
-            {"id": "t-week-1", "title": "Prepare roadmap notes", "column": "todo", "priority": "medium", "due": "2026-04-20"}
+            {"id": "t-week-1", "title": "Prepare roadmap notes", "column": "todo", "priority": "medium", "due": "2026-04-20T00:00:00Z"}
         ],
         "later": [
-            {"id": "t-later-1", "title": "Draft Q3 hypotheses", "column": "todo", "priority": "low", "due": "2026-04-29"}
+            {"id": "t-later-1", "title": "Draft Q3 hypotheses", "column": "todo", "priority": "low", "due": "2026-04-29T00:00:00Z"}
         ],
         "done": [
-            {"id": "t-done-1", "title": "Publish retro notes", "column": "done", "priority": "low", "due": "2026-04-15"}
+            {"id": "t-done-1", "title": "Publish retro notes", "column": "done", "priority": "low", "due": "2026-04-15T00:00:00Z"}
         ],
     },
     "emp-2": {"overdue": [], "today": [], "this_week": [], "later": [], "done": []},
@@ -327,6 +330,10 @@ EMPLOYEE_VERTICAL_TASKS = {
 }
 
 _quick_task_seq = count(2000)
+
+
+def _iso_z_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def list_buildings() -> list[dict]:
@@ -447,7 +454,9 @@ def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
         "employee": {
             "id": profile["header"]["id"],
             "full_name": profile["header"]["full_name"],
-            "role": profile["header"]["title"],
+            # role is canonical for logic; title is display label.
+            "role": profile["header"]["role"],
+            "title": profile["header"]["title"],
             "avatar": profile["header"]["avatar"],
             "status": profile["header"]["status"],
             "email": profile["contacts"]["work_email"],
@@ -462,7 +471,7 @@ def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
             "ai_tip": "Сфокусируйся на overdue и today задачах.",
         },
         "today_focus": {
-            "date": datetime.now(timezone.utc).date().isoformat(),
+            "date": _iso_z_now(),
             "primary_goal": "Закрыть P0 employee vertical",
             "meetings_count": 2,
             "tasks_due_today": len(next(group["tasks"] for group in grouped if group["key"] == "today")),
@@ -490,6 +499,12 @@ def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
             "suggested_prompts": ["Что в фокусе на сегодня?", "Собери краткий апдейт по задачам."],
         },
         "viewer_role": viewer_role,
+        "contract_meta": {
+            "encoding": "utf-8",
+            "locale": "ru-RU",
+            "timestamp_format": "iso-8601-z",
+            "header_role_source_of_truth": "header.role",
+        },
     }
     extras = _role_extras(viewer_role)
     if extras:
@@ -503,7 +518,10 @@ def get_employee_owner_profile(employee_id: str) -> dict:
         raise NotFound(detail=f"Employee '{employee_id}' not found.")
     return {
         "view": "owner",
-        "header": profile["header"],
+        "header": {
+            **profile["header"],
+            "role_source_of_truth": "role",
+        },
         "contacts": {k: v for k, v in profile["contacts"].items() if k != "is_work_email_public"},
         "performance": profile["performance"],
         "projects": profile["projects"],
@@ -525,7 +543,10 @@ def get_employee_public_profile(employee_id: str) -> dict:
         contacts["work_email"] = profile["contacts"]["work_email"]
     return {
         "view": "public",
-        "header": profile["header"],
+        "header": {
+            **profile["header"],
+            "role_source_of_truth": "role",
+        },
         "contacts": contacts,
         "public_projects": profile["projects"],
         "public_achievements": profile["achievements"],
@@ -558,7 +579,7 @@ def create_workspace_quick_task(employee_id: str, title: str, slot: str, priorit
         "title": title,
         "column": "todo" if slot != "done" else "done",
         "priority": priority or "medium",
-        "due": datetime.now(timezone.utc).date().isoformat(),
+        "due": _iso_z_now(),
     }
     if slot not in EMPLOYEE_VERTICAL_TASKS[employee_id]:
         EMPLOYEE_VERTICAL_TASKS[employee_id][slot] = []
@@ -572,9 +593,119 @@ def create_workspace_quick_task(employee_id: str, title: str, slot: str, priorit
                     "id": f"a-{task_id}",
                     "type": "task",
                     "title": f"Quick task created for project {project_id}",
-                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "timestamp": _iso_z_now(),
                     "href": f"/app/tasks/{task_id}",
                     "actor": {"id": employee_id, "name": profile["header"]["full_name"]},
                 },
             )
     return {"task_id": task_id, "slot": slot, "title": title}
+
+
+def _all_employee_tasks(employee_id: str) -> list[dict]:
+    grouped = EMPLOYEE_VERTICAL_TASKS.get(employee_id)
+    if not grouped:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    items: list[dict] = []
+    for group_key in ["overdue", "today", "this_week", "later", "done"]:
+        for task in grouped.get(group_key, []):
+            row = deepcopy(task)
+            row["group"] = group_key
+            items.append(row)
+    return items
+
+
+def list_workspace_tasks(employee_id: str, filters: dict | None = None) -> list[dict]:
+    items = _all_employee_tasks(employee_id)
+    params = filters or {}
+    q = (params.get("q") or "").strip().lower()
+    column = (params.get("column") or params.get("status") or "").strip()
+    priority = (params.get("priority") or "").strip()
+    if q:
+        items = [t for t in items if q in str(t.get("title", "")).lower()]
+    if column:
+        items = [t for t in items if t.get("column") == column]
+    if priority:
+        items = [t for t in items if t.get("priority") == priority]
+    return items
+
+
+def get_workspace_task(employee_id: str, task_id: str) -> dict:
+    for task in _all_employee_tasks(employee_id):
+        if str(task.get("id")) == str(task_id):
+            return task
+    raise NotFound(detail="Task not found.")
+
+
+def create_workspace_task(employee_id: str, payload: dict) -> dict:
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise ValidationError({"detail": "title is required."})
+    column = payload.get("column") or payload.get("status") or "todo"
+    if column not in {"todo", "in_progress", "done"}:
+        raise ValidationError({"detail": "Invalid column."})
+    priority = payload.get("priority") or "medium"
+    if priority not in {"high", "medium", "low"}:
+        raise ValidationError({"detail": "Invalid priority."})
+    due = payload.get("due") or _iso_z_now()
+    task_id = f"t-{next(_quick_task_seq)}"
+    task = {
+        "id": task_id,
+        "title": title,
+        "column": column,
+        "priority": priority,
+        "due": due,
+        "project_id": payload.get("project_id"),
+    }
+    # Alias route stores into "today" by default so workspace can render it immediately.
+    EMPLOYEE_VERTICAL_TASKS.setdefault(employee_id, {"overdue": [], "today": [], "this_week": [], "later": [], "done": []})
+    target_group = "done" if column == "done" else "today"
+    EMPLOYEE_VERTICAL_TASKS[employee_id].setdefault(target_group, [])
+    EMPLOYEE_VERTICAL_TASKS[employee_id][target_group].insert(0, task)
+    return task
+
+
+def patch_workspace_task(employee_id: str, task_id: str, payload: dict) -> dict:
+    grouped = EMPLOYEE_VERTICAL_TASKS.get(employee_id)
+    if not grouped:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    for group_name, tasks in grouped.items():
+        for task in tasks:
+            if str(task.get("id")) != str(task_id):
+                continue
+            if "title" in payload:
+                task["title"] = payload["title"]
+            if "column" in payload or "status" in payload:
+                new_column = payload.get("column") or payload.get("status")
+                if new_column not in {"todo", "in_progress", "done"}:
+                    raise ValidationError({"detail": "Invalid column."})
+                task["column"] = new_column
+            if "priority" in payload:
+                new_priority = payload["priority"]
+                if new_priority not in {"high", "medium", "low"}:
+                    raise ValidationError({"detail": "Invalid priority."})
+                task["priority"] = new_priority
+            if "due" in payload:
+                task["due"] = payload["due"]
+            task["updated_at"] = _iso_z_now()
+            if group_name != "done" and task.get("column") == "done":
+                tasks.remove(task)
+                grouped.setdefault("done", [])
+                grouped["done"].insert(0, task)
+            elif group_name == "done" and task.get("column") != "done":
+                tasks.remove(task)
+                grouped.setdefault("today", [])
+                grouped["today"].insert(0, task)
+            return deepcopy(task)
+    raise NotFound(detail="Task not found.")
+
+
+def delete_workspace_task(employee_id: str, task_id: str) -> None:
+    grouped = EMPLOYEE_VERTICAL_TASKS.get(employee_id)
+    if not grouped:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    for _, tasks in grouped.items():
+        for task in list(tasks):
+            if str(task.get("id")) == str(task_id):
+                tasks.remove(task)
+                return
+    raise NotFound(detail="Task not found.")

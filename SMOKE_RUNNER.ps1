@@ -1,6 +1,7 @@
 param(
     [string]$BaseUrl = "http://127.0.0.1:8000/api",
     [string]$CompanyUsername = "company_admin_test",
+    [string]$EmployeeUsername = "employee_test",
     [string]$SuperUsername = "super_admin_test",
     [string]$Password = "Pass12345!",
     [ValidateSet("Fast", "Full")]
@@ -275,10 +276,122 @@ if (-not $abort) {
     }
 
     Invoke-Api -Step "workspace_employee_context" -Method "GET" -Path "/buildings/$buildingId/floors/$floorId/workspace/employee/$employeeId" -ExpectedStatuses @(200) -Session $companySession | Out-Null
-    Invoke-Api -Step "employee_profile" -Method "GET" -Path "/buildings/$buildingId/floors/$floorId/employees/$employeeId/profile" -ExpectedStatuses @(200) -Session $companySession | Out-Null
-    Invoke-Api -Step "workspace_context_alias" -Method "GET" -Path "/buildings/$buildingId/floors/$floorId/workspace-context?employee_id=$employeeId" -ExpectedStatuses @(200) -Session $companySession | Out-Null
-    Invoke-Api -Step "workspace_context_global_alias" -Method "GET" -Path "/workspace/context?building_id=$buildingId&floor_id=$floorId&employee_id=$employeeId" -ExpectedStatuses @(200) -Session $companySession | Out-Null
-    Invoke-Api -Step "employee_profile_global_alias" -Method "GET" -Path "/employees/$employeeId/profile?building_id=$buildingId&floor_id=$floorId" -ExpectedStatuses @(200) -Session $companySession | Out-Null
+    $employeeProfileResp = Invoke-Api -Step "employee_profile" -Method "GET" -Path "/buildings/$buildingId/floors/$floorId/employees/$employeeId/profile" -ExpectedStatuses @(200) -Session $companySession
+    $workspaceContextAliasResp = Invoke-Api -Step "workspace_context_alias" -Method "GET" -Path "/buildings/$buildingId/floors/$floorId/workspace-context?employee_id=$employeeId" -ExpectedStatuses @(200) -Session $companySession
+    $workspaceContextGlobalAliasResp = Invoke-Api -Step "workspace_context_global_alias" -Method "GET" -Path "/workspace/context?building_id=$buildingId&floor_id=$floorId&employee_id=$employeeId" -ExpectedStatuses @(200) -Session $companySession
+    $employeeProfileGlobalAliasResp = Invoke-Api -Step "employee_profile_global_alias" -Method "GET" -Path "/employees/$employeeId/profile?building_id=$buildingId&floor_id=$floorId" -ExpectedStatuses @(200) -Session $companySession
+
+    $legacyPayload = @(
+        [string]$workspaceContextAliasResp.Content,
+        [string]$workspaceContextGlobalAliasResp.Content,
+        [string]$employeeProfileResp.Content,
+        [string]$employeeProfileGlobalAliasResp.Content
+    ) -join "`n"
+    $legacyNoOffsetOk = ($legacyPayload -notlike "*+03:00*")
+    Add-Result -Step "legacy_timestamps_no_offset_plus03" -Method "GET" -Path "/workspace-context + /employees/*/profile" -Expected "no +03:00 in payload" -Actual $(if ($legacyNoOffsetOk) { 200 } else { 0 }) -Ok $legacyNoOffsetOk -Note ""
+    $legacyHasZuluOk = ($legacyPayload -like "*Z*")
+    Add-Result -Step "legacy_timestamps_has_zulu" -Method "GET" -Path "/workspace-context + /employees/*/profile" -Expected "has ISO-8601 Z timestamps" -Actual $(if ($legacyHasZuluOk) { 200 } else { 0 }) -Ok $legacyHasZuluOk -Note ""
+}
+
+Write-Host "== STEP 1.5: employee vertical ==" -ForegroundColor Cyan
+$employeeSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$employeeLogin = Invoke-Api -Step "auth_login_employee" -Method "POST" -Path "/auth/login" -ExpectedStatuses @(200) -Session $employeeSession -Body @{
+    username = $EmployeeUsername
+    password = $Password
+}
+if ($employeeLogin.Ok) {
+    $employeeBuildingId = "bcs-drift"
+    if (-not [string]::IsNullOrWhiteSpace([string]$buildingId)) { $employeeBuildingId = [string]$buildingId }
+    $employeeFloorId = "3"
+    if (-not [string]::IsNullOrWhiteSpace([string]$floorId)) { $employeeFloorId = [string]$floorId }
+
+    $workspaceResp = Invoke-Api -Step "employee_workspace" -Method "GET" -Path "/workspace" -ExpectedStatuses @(200) -Session $employeeSession
+    $workspaceJson = Parse-JsonSafe -Text $workspaceResp.Content
+    $employeeRole = ""
+    $employeeTitle = ""
+    $timestampFormat = ""
+    $todayFocusDate = ""
+    if ($workspaceJson) {
+        $employeeRole = [string]$workspaceJson.employee.role
+        $employeeTitle = [string]$workspaceJson.employee.title
+        $timestampFormat = [string]$workspaceJson.contract_meta.timestamp_format
+        $todayFocusDate = [string]$workspaceJson.today_focus.date
+    }
+    $employeeRoleOk = -not [string]::IsNullOrWhiteSpace($employeeRole)
+    Add-Result -Step "employee_workspace_role_present" -Method "GET" -Path "/workspace" -Expected "employee.role present" -Actual $(if ($employeeRoleOk) { 200 } else { 0 }) -Ok $employeeRoleOk -Note "role=$employeeRole"
+    $employeeTitleOk = -not [string]::IsNullOrWhiteSpace($employeeTitle)
+    Add-Result -Step "employee_workspace_title_present" -Method "GET" -Path "/workspace" -Expected "employee.title present" -Actual $(if ($employeeTitleOk) { 200 } else { 0 }) -Ok $employeeTitleOk -Note "title=$employeeTitle"
+    $timestampFormatOk = ($timestampFormat -eq "iso-8601-z")
+    Add-Result -Step "employee_workspace_timestamp_format" -Method "GET" -Path "/workspace" -Expected "contract_meta.timestamp_format=iso-8601-z" -Actual $(if ($timestampFormatOk) { 200 } else { 0 }) -Ok $timestampFormatOk -Note "actual=$timestampFormat"
+    $todayFocusDateOk = ($todayFocusDate -match "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+    Add-Result -Step "employee_workspace_today_focus_iso" -Method "GET" -Path "/workspace" -Expected "ISO-8601 Z timestamp" -Actual $(if ($todayFocusDateOk) { 200 } else { 0 }) -Ok $todayFocusDateOk -Note "date=$todayFocusDate"
+
+    $meResp = Invoke-Api -Step "employee_me_owner" -Method "GET" -Path "/employees/me" -ExpectedStatuses @(200) -Session $employeeSession
+    $meJson = Parse-JsonSafe -Text $meResp.Content
+    $ownEmployeeId = [string]$meJson.header.id
+    $ownerSot = [string]$meJson.header.role_source_of_truth
+    $ownerSotOk = ($ownerSot -eq "role")
+    Add-Result -Step "employee_me_role_source_of_truth" -Method "GET" -Path "/employees/me" -Expected "header.role_source_of_truth=role" -Actual $(if ($ownerSotOk) { 200 } else { 0 }) -Ok $ownerSotOk -Note "actual=$ownerSot"
+
+    if (-not [string]::IsNullOrWhiteSpace($ownEmployeeId)) {
+        Invoke-Api -Step "employee_profile_owner_by_id" -Method "GET" -Path "/employees/$ownEmployeeId" -ExpectedStatuses @(200) -Session $employeeSession | Out-Null
+    }
+    $publicResp = Invoke-Api -Step "employee_profile_public" -Method "GET" -Path "/employees/emp-2" -ExpectedStatuses @(200) -Session $employeeSession
+    $publicJson = Parse-JsonSafe -Text $publicResp.Content
+    $publicView = [string]$publicJson.view
+    $publicViewOk = ($publicView -eq "public")
+    Add-Result -Step "employee_profile_public_view" -Method "GET" -Path "/employees/emp-2" -Expected "view=public" -Actual $(if ($publicViewOk) { 200 } else { 0 }) -Ok $publicViewOk -Note "view=$publicView"
+    $publicNoPerfOk = ($null -eq $publicJson.performance)
+    Add-Result -Step "employee_profile_public_no_performance" -Method "GET" -Path "/employees/emp-2" -Expected "no performance in public profile" -Actual $(if ($publicNoPerfOk) { 200 } else { 0 }) -Ok $publicNoPerfOk -Note ""
+    $publicNoPreferencesOk = ($null -eq $publicJson.preferences)
+    Add-Result -Step "employee_profile_public_no_preferences" -Method "GET" -Path "/employees/emp-2" -Expected "no preferences in public profile" -Actual $(if ($publicNoPreferencesOk) { 200 } else { 0 }) -Ok $publicNoPreferencesOk -Note ""
+    $publicNoPersonalEmailOk = ($null -eq $publicJson.contacts.personal_email)
+    Add-Result -Step "employee_profile_public_no_personal_email" -Method "GET" -Path "/employees/emp-2" -Expected "no personal_email in public contacts" -Actual $(if ($publicNoPersonalEmailOk) { 200 } else { 0 }) -Ok $publicNoPersonalEmailOk -Note ""
+    $publicNoPhoneOk = ($null -eq $publicJson.contacts.phone)
+    Add-Result -Step "employee_profile_public_no_phone" -Method "GET" -Path "/employees/emp-2" -Expected "no phone in public contacts" -Actual $(if ($publicNoPhoneOk) { 200 } else { 0 }) -Ok $publicNoPhoneOk -Note ""
+
+    $workspaceTasksScope = "/workspace/tasks?building_id=$employeeBuildingId&floor_id=$employeeFloorId"
+    Invoke-Api -Step "workspace_tasks_alias_missing_scope" -Method "GET" -Path "/workspace/tasks" -ExpectedStatuses @(400) -Session $employeeSession | Out-Null
+    Invoke-Api -Step "workspace_tasks_alias_list" -Method "GET" -Path $workspaceTasksScope -ExpectedStatuses @(200) -Session $employeeSession | Out-Null
+    Invoke-Api -Step "workspace_tasks_alias_filter_column" -Method "GET" -Path "$workspaceTasksScope&column=todo" -ExpectedStatuses @(200) -Session $employeeSession | Out-Null
+
+    $employeeCsrf = Get-CsrfToken -Session $employeeSession -Origin $BaseUrl
+    if (-not [string]::IsNullOrWhiteSpace($employeeCsrf)) {
+        $workspaceTaskCreateResp = Invoke-Api -Step "workspace_task_alias_create" -Method "POST" -Path $workspaceTasksScope -ExpectedStatuses @(201) -Session $employeeSession -UseCsrf -Body @{
+            title = "Workspace task alias smoke $(Get-Date -Format HHmmss)"
+            column = "todo"
+            priority = "medium"
+        }
+        $workspaceTaskId = $null
+        if ($workspaceTaskCreateResp.Ok) {
+            $workspaceTaskCreateJson = Parse-JsonSafe -Text $workspaceTaskCreateResp.Content
+            if ($workspaceTaskCreateJson -and $workspaceTaskCreateJson.id) {
+                $workspaceTaskId = [string]$workspaceTaskCreateJson.id
+            }
+        }
+        if ($workspaceTaskId) {
+            Invoke-Api -Step "workspace_task_alias_detail" -Method "GET" -Path "/workspace/tasks/${workspaceTaskId}?building_id=${employeeBuildingId}&floor_id=${employeeFloorId}" -ExpectedStatuses @(200) -Session $employeeSession | Out-Null
+            Invoke-Api -Step "workspace_task_alias_patch" -Method "PATCH" -Path "/workspace/tasks/${workspaceTaskId}?building_id=${employeeBuildingId}&floor_id=${employeeFloorId}" -ExpectedStatuses @(200) -Session $employeeSession -UseCsrf -Body @{
+                column = "in_progress"
+                priority = "high"
+            } | Out-Null
+            Invoke-Api -Step "workspace_task_alias_delete" -Method "DELETE" -Path "/workspace/tasks/${workspaceTaskId}?building_id=${employeeBuildingId}&floor_id=${employeeFloorId}" -ExpectedStatuses @(204) -Session $employeeSession -UseCsrf | Out-Null
+            Invoke-Api -Step "workspace_task_alias_detail_after_delete" -Method "GET" -Path "/workspace/tasks/${workspaceTaskId}?building_id=${employeeBuildingId}&floor_id=${employeeFloorId}" -ExpectedStatuses @(404) -Session $employeeSession | Out-Null
+        }
+
+        Invoke-Api -Step "employee_me_patch" -Method "PATCH" -Path "/employees/me" -ExpectedStatuses @(200) -Session $employeeSession -UseCsrf -Body @{
+            city = "Moscow"
+            preferences = @{ ai_suggestions = $true }
+        } | Out-Null
+        Invoke-Api -Step "employee_quick_task_create" -Method "POST" -Path "/workspace/quick-tasks" -ExpectedStatuses @(201) -Session $employeeSession -UseCsrf -Body @{
+            title = "Employee vertical smoke $(Get-Date -Format HHmmss)"
+            slot = "today"
+            priority = "high"
+            project_id = "pr-1"
+        } | Out-Null
+    } else {
+        Add-Result -Step "employee_csrf_token_present" -Method "GET" -Path "/auth/login" -Expected "csrftoken cookie present" -Actual 0 -Ok $false -Note "csrf cookie missing"
+    }
 }
 
 Write-Host "== STEP 2: projects ==" -ForegroundColor Cyan
