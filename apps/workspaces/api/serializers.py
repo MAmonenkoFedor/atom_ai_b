@@ -135,3 +135,68 @@ class EmployeeProfileSerializer(serializers.Serializer):
     activity_feed = ActivitySerializer(many=True)
     comments_history = CommentSerializer(many=True)
     performance = PerformanceSerializer()
+
+
+class FlexibleObjectSerializer(serializers.Serializer):
+    class Meta:
+        ref_name = "WorkspaceFlexibleObject"
+
+
+class WorkspaceEmployeeCabinetSerializer(serializers.Serializer):
+    employee = serializers.JSONField()
+    greeting = serializers.JSONField()
+    today_focus = serializers.JSONField()
+    quick_actions = serializers.JSONField()
+    stats = serializers.JSONField()
+    tasks_grouped = serializers.JSONField()
+    project_context = serializers.JSONField()
+    activity_feed = serializers.JSONField()
+    ai_context = serializers.JSONField()
+    role_extras = serializers.JSONField(required=False)
+    viewer_role = serializers.CharField()
+
+
+class EmployeeOwnerProfileSerializer(serializers.Serializer):
+    view = serializers.CharField()
+    header = serializers.JSONField()
+    contacts = serializers.JSONField()
+    performance = serializers.JSONField()
+    projects = serializers.JSONField()
+    achievements = serializers.JSONField()
+    bonus_goals = serializers.JSONField()
+    activity_feed = serializers.JSONField()
+    comments_history = serializers.JSONField()
+    preferences = serializers.JSONField()
+    editable_fields = serializers.JSONField()
+
+
+class EmployeePublicProfileSerializer(serializers.Serializer):
+    view = serializers.CharField()
+    header = serializers.JSONField()
+    contacts = serializers.JSONField()
+    public_projects = serializers.JSONField()
+    public_achievements = serializers.JSONField()
+    public_stats = serializers.JSONField()
+
+
+class UpdateMyEmployeeProfileSerializer(serializers.Serializer):
+    personal_email = serializers.EmailField(required=False)
+    phone = serializers.CharField(required=False)
+    telegram = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    working_hours = serializers.CharField(required=False)
+    timezone = serializers.CharField(required=False)
+    preferences = serializers.DictField(required=False)
+
+
+class QuickTaskCreateSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    slot = serializers.ChoiceField(choices=["today", "this_week", "later"])
+    priority = serializers.ChoiceField(choices=["high", "medium", "low"], required=False)
+    project_id = serializers.CharField(required=False)
+
+
+class QuickTaskCreateResponseSerializer(serializers.Serializer):
+    task_id = serializers.CharField()
+    slot = serializers.CharField()
+    title = serializers.CharField()

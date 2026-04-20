@@ -922,6 +922,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorDetail'
           description: ''
+  /api/employees/{employee_id}:
+    get:
+      operationId: employeeProfileOwnerOrPublic
+      parameters:
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - employees
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
   /api/employees/{employee_id}/profile:
     get:
       operationId: employeeProfileGlobalAlias
@@ -953,6 +974,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
+  /api/employees/me:
+    get:
+      operationId: employeeMeProfile
+      tags:
+      - employees
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
+    patch:
+      operationId: employeeMeProfilePatch
+      tags:
+      - employees
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
           description: ''
   /api/projects:
     get:
@@ -1702,6 +1763,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/TaskStats'
           description: ''
+  /api/workspace:
+    get:
+      operationId: employeeWorkspaceCabinet
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEmployeeCabinet'
+          description: ''
   /api/workspace/context:
     get:
       operationId: workspaceContextGlobalAlias
@@ -1733,6 +1809,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+  /api/workspace/quick-tasks:
+    post:
+      operationId: workspaceQuickTasksCreate
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickTaskCreateResponse'
           description: ''
 components:
   schemas:
@@ -2215,6 +2318,33 @@ components:
       - timezone
       - x
       - y
+    EmployeeOwnerProfile:
+      type: object
+      properties:
+        view:
+          type: string
+        header: {}
+        contacts: {}
+        performance: {}
+        projects: {}
+        achievements: {}
+        bonus_goals: {}
+        activity_feed: {}
+        comments_history: {}
+        preferences: {}
+        editable_fields: {}
+      required:
+      - achievements
+      - activity_feed
+      - bonus_goals
+      - comments_history
+      - contacts
+      - editable_fields
+      - header
+      - performance
+      - preferences
+      - projects
+      - view
     EmployeeProfile:
       type: object
       properties:
@@ -2397,6 +2527,25 @@ components:
       properties:
         role:
           $ref: '#/components/schemas/CompanyUserRoleEnum'
+    PatchedUpdateMyEmployeeProfile:
+      type: object
+      properties:
+        personal_email:
+          type: string
+          format: email
+        phone:
+          type: string
+        telegram:
+          type: string
+        city:
+          type: string
+        working_hours:
+          type: string
+        timezone:
+          type: string
+        preferences:
+          type: object
+          additionalProperties: {}
     PatchedUpdateTaskRequest:
       type: object
       properties:
@@ -2721,6 +2870,33 @@ components:
           $ref: '#/components/schemas/ProjectStatusEnum'
       required:
       - name
+    QuickTaskCreate:
+      type: object
+      properties:
+        title:
+          type: string
+        slot:
+          $ref: '#/components/schemas/SlotEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        project_id:
+          type: string
+      required:
+      - slot
+      - title
+    QuickTaskCreateResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        slot:
+          type: string
+        title:
+          type: string
+      required:
+      - slot
+      - task_id
+      - title
     RequestStatusEnum:
       enum:
       - success
@@ -2791,6 +2967,16 @@ components:
         * `medium` - medium
         * `high` - high
         * `critical` - critical
+    SlotEnum:
+      enum:
+      - today
+      - this_week
+      - later
+      type: string
+      description: |-
+        * `today` - today
+        * `this_week` - this_week
+        * `later` - later
     SuperAdminOverview:
       type: object
       properties:
@@ -3034,6 +3220,32 @@ components:
       - department
       - employees
       - zones
+    WorkspaceEmployeeCabinet:
+      type: object
+      properties:
+        employee: {}
+        greeting: {}
+        today_focus: {}
+        quick_actions: {}
+        stats: {}
+        tasks_grouped: {}
+        project_context: {}
+        activity_feed: {}
+        ai_context: {}
+        role_extras: {}
+        viewer_role:
+          type: string
+      required:
+      - activity_feed
+      - ai_context
+      - employee
+      - greeting
+      - project_context
+      - quick_actions
+      - stats
+      - tasks_grouped
+      - today_focus
+      - viewer_role
     WorkspaceProject:
       type: object
       properties:

@@ -7,6 +7,9 @@ paths:
   /api/admin/action-center/events:
     get:
       operationId: adminActionEventsList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
@@ -16,6 +19,13 @@ paths:
         name: actor
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -61,6 +71,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminActionListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 103
+                        timestamp: '2026-04-15T10:20:00Z'
+                        scope: platform
+                        severity: critical
+                        status: failed
+                        action: invite_revoke
+                        actor: security@platform.com
+                        details:
+                          invite_id: 2001
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T10:10:00Z::102
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=2026-04-15T10:10:00Z::102&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 101
+                        timestamp: '2026-04-15T10:00:00Z'
+                        scope: company
+                        severity: medium
+                        status: success
+                        action: user_role_update
+                        actor: admin@company.com
+                        details:
+                          target_user_id: 13
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/admin/action-center/events/{action_id}:
     get:
@@ -107,6 +156,9 @@ paths:
   /api/admin/actions/events:
     get:
       operationId: adminActionEventsList_2
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
@@ -116,6 +168,13 @@ paths:
         name: actor
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -161,6 +220,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminActionListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 103
+                        timestamp: '2026-04-15T10:20:00Z'
+                        scope: platform
+                        severity: critical
+                        status: failed
+                        action: invite_revoke
+                        actor: security@platform.com
+                        details:
+                          invite_id: 2001
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T10:10:00Z::102
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=2026-04-15T10:10:00Z::102&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 101
+                        timestamp: '2026-04-15T10:00:00Z'
+                        scope: company
+                        severity: medium
+                        status: success
+                        action: user_role_update
+                        actor: admin@company.com
+                        details:
+                          target_user_id: 13
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/admin/actions/events/{action_id}:
     get:
@@ -383,11 +481,21 @@ paths:
   /api/admin/platform/audit/events:
     get:
       operationId: platformAuditEventsList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -433,6 +541,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlatformAuditListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 3
+                        timestamp: '2026-04-15T10:20:00Z'
+                        tenant_id: 201
+                        action: tenant_status_change
+                        severity: high
+                        status: success
+                        actor_type: system
+                        message: Tenant moved to active
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T09:20:00Z::2
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=2026-04-15T09:20:00Z::2&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 1
+                        timestamp: '2026-04-15T09:00:00Z'
+                        tenant_id: 201
+                        action: invite_create
+                        severity: medium
+                        status: success
+                        actor_type: user
+                        message: Invite sent to admin@tenant-a.com
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/admin/platform/audit/export:
     get:
@@ -768,44 +913,221 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedAiRunLogList'
           description: ''
+  /api/alignment/schema/:
+    get:
+      operationId: api_alignment_schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - ckb
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - ms
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - ug
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/auth/invite/activate:
     post:
-      operationId: api_auth_invite_activate_create
+      operationId: authInviteActivate
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
       security:
       - cookieAuth: []
       - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteActivateResponse'
+          description: ''
   /api/auth/login:
     post:
-      operationId: api_auth_login_create
+      operationId: authLogin
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+        required: true
       security:
       - cookieAuth: []
       - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
   /api/auth/logout:
     post:
-      operationId: api_auth_logout_create
+      operationId: authLogout
       tags:
       - api
       security:
       - cookieAuth: []
       - basicAuth: []
       responses:
-        '200':
-          description: No response body
+        '204':
+          description: Logged out
   /api/auth/session:
     get:
-      operationId: api_auth_session_retrieve
+      operationId: authSession
       tags:
       - api
       security:
@@ -813,10 +1135,14 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
   /api/buildings:
     get:
-      operationId: api_buildings_retrieve
+      operationId: buildingsList
       tags:
       - api
       security:
@@ -825,10 +1151,16 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildingListItem'
+          description: ''
   /api/buildings/{building_id}:
     get:
-      operationId: api_buildings_retrieve_2
+      operationId: buildingDetail
       parameters:
       - in: path
         name: building_id
@@ -843,10 +1175,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildingDetail'
+          description: ''
   /api/buildings/{building_id}/departments:
     get:
-      operationId: api_buildings_departments_retrieve
+      operationId: buildingDepartments
       parameters:
       - in: path
         name: building_id
@@ -861,10 +1197,16 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+          description: ''
   /api/buildings/{building_id}/floors/{floor_id}/employees/{employee_id}/profile:
     get:
-      operationId: api_buildings_floors_employees_profile_retrieve
+      operationId: employeeProfileByFloor
       parameters:
       - in: path
         name: building_id
@@ -889,10 +1231,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
   /api/buildings/{building_id}/floors/{floor_id}/workspace:
     get:
-      operationId: api_buildings_floors_workspace_retrieve
+      operationId: floorWorkspace
       parameters:
       - in: path
         name: building_id
@@ -912,13 +1258,22 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+          description: ''
   /api/buildings/{building_id}/floors/{floor_id}/workspace-context:
     get:
-      operationId: api_buildings_floors_workspace_context_retrieve
+      operationId: workspaceContextAlias
       parameters:
       - in: path
         name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
         schema:
           type: string
         required: true
@@ -935,10 +1290,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
   /api/buildings/{building_id}/floors/{floor_id}/workspace/employee/{employee_id}:
     get:
-      operationId: api_buildings_floors_workspace_employee_retrieve
+      operationId: employeeWorkspaceContext
       parameters:
       - in: path
         name: building_id
@@ -963,7 +1322,11 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
   /api/chats:
     get:
       operationId: api_chats_list
@@ -1360,9 +1723,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedEmployeeList'
           description: ''
-  /api/employees/{employee_id}/profile:
+  /api/employees/{employee_id}:
     get:
-      operationId: api_employees_profile_retrieve
+      operationId: employeeProfileOwnerOrPublic
       parameters:
       - in: path
         name: employee_id
@@ -1374,10 +1737,45 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
+  /api/employees/{employee_id}/profile:
+    get:
+      operationId: employeeProfileGlobalAlias
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
   /api/employees/{id}:
     get:
       operationId: api_employees_retrieve
@@ -1398,6 +1796,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Employee'
+          description: ''
+  /api/employees/me:
+    get:
+      operationId: employeeMeProfile
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
+    patch:
+      operationId: employeeMeProfilePatch
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
           description: ''
   /api/me:
     get:
@@ -1564,11 +2002,21 @@ paths:
   /api/platform/admin/audit/events:
     get:
       operationId: platformAuditEventsList_2
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -1614,6 +2062,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlatformAuditListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 3
+                        timestamp: '2026-04-15T10:20:00Z'
+                        tenant_id: 201
+                        action: tenant_status_change
+                        severity: high
+                        status: success
+                        actor_type: system
+                        message: Tenant moved to active
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T09:20:00Z::2
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=2026-04-15T09:20:00Z::2&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 1
+                        timestamp: '2026-04-15T09:00:00Z'
+                        tenant_id: 201
+                        action: invite_create
+                        severity: medium
+                        status: success
+                        actor_type: user
+                        message: Invite sent to admin@tenant-a.com
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/platform/admin/audit/export:
     get:
@@ -1959,7 +2444,7 @@ paths:
           description: ''
   /api/projects/{id}/archive:
     post:
-      operationId: api_projects_archive_create
+      operationId: projectArchive
       parameters:
       - in: path
         name: id
@@ -1973,7 +2458,11 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
   /api/projects/{id}/members:
     get:
       operationId: api_projects_members_list
@@ -2053,7 +2542,7 @@ paths:
           description: ''
   /api/projects/{id}/members/{member_id}:
     patch:
-      operationId: api_projects_members_partial_update
+      operationId: projectMemberUpdate
       parameters:
       - in: path
         name: id
@@ -2067,14 +2556,29 @@ paths:
         required: true
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
       security:
       - cookieAuth: []
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+          description: ''
     delete:
-      operationId: api_projects_members_destroy
+      operationId: projectMemberDelete
       parameters:
       - in: path
         name: id
@@ -2093,10 +2597,10 @@ paths:
       - basicAuth: []
       responses:
         '204':
-          description: No response body
+          description: Project member deleted
   /api/projects/{id}/restore:
     post:
-      operationId: api_projects_restore_create
+      operationId: projectRestore
       parameters:
       - in: path
         name: id
@@ -2110,7 +2614,11 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
   /api/schema/:
     get:
       operationId: api_schema_retrieve
@@ -2260,13 +2768,31 @@ paths:
   /api/tasks:
     get:
       operationId: tasksList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: assignee_id
         schema:
           type: integer
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
         name: department_id
+        schema:
+          type: integer
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
         schema:
           type: integer
       - in: query
@@ -2282,9 +2808,23 @@ paths:
         schema:
           type: string
       - in: query
+        name: sort
+        schema:
+          type: string
+      - in: query
         name: status
         schema:
           type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
       tags:
       - api
       security:
@@ -2296,6 +2836,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks?cursor=&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:21:49.573218Z::2004
+                      results:
+                      - id: 2005
+                        title: Cursor smoke 0
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks?cursor=2026-04-15T12:21:49.573218Z::2004&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T10:00:00Z::2002
+                      results:
+                      - id: 2004
+                        title: Cursor smoke 1
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: Second cursor page
           description: ''
     post:
       operationId: tasksCreate
@@ -2418,7 +3003,29 @@ paths:
   /api/tasks/{task_id}/activity:
     get:
       operationId: taskActivityList
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
       - in: path
         name: task_id
         schema:
@@ -2435,6 +3042,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskActivityListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:23:54.103397Z::2
+                      results:
+                      - id: 3
+                        task_id: 2003
+                        event_type: updated
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          changed_fields:
+                            status:
+                              from: todo
+                              to: in_progress
+                        created_at: '2026-04-15T12:23:54.103397Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=2026-04-15T12:23:54.103397Z::2&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: null
+                      results:
+                      - id: 1
+                        task_id: 2003
+                        event_type: created
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          status: todo
+                          priority: medium
+                          assignee_id: 12
+                        created_at: '2026-04-15T12:23:54.100000Z'
+                  summary: Second cursor page
           description: ''
         '404':
           content:
@@ -2466,6 +3117,16 @@ paths:
         name: q
         schema:
           type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
       tags:
       - api
       security:
@@ -2560,6 +3221,9 @@ paths:
   /api/v1/admin/action-center/events:
     get:
       operationId: adminActionEventsList_3
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
@@ -2569,6 +3233,13 @@ paths:
         name: actor
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -2614,6 +3285,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminActionListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 103
+                        timestamp: '2026-04-15T10:20:00Z'
+                        scope: platform
+                        severity: critical
+                        status: failed
+                        action: invite_revoke
+                        actor: security@platform.com
+                        details:
+                          invite_id: 2001
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T10:10:00Z::102
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=2026-04-15T10:10:00Z::102&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 101
+                        timestamp: '2026-04-15T10:00:00Z'
+                        scope: company
+                        severity: medium
+                        status: success
+                        action: user_role_update
+                        actor: admin@company.com
+                        details:
+                          target_user_id: 13
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/v1/admin/action-center/events/{action_id}:
     get:
@@ -2660,6 +3370,9 @@ paths:
   /api/v1/admin/actions/events:
     get:
       operationId: adminActionEventsList_4
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
@@ -2669,6 +3382,13 @@ paths:
         name: actor
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -2714,6 +3434,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminActionListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 103
+                        timestamp: '2026-04-15T10:20:00Z'
+                        scope: platform
+                        severity: critical
+                        status: failed
+                        action: invite_revoke
+                        actor: security@platform.com
+                        details:
+                          invite_id: 2001
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T10:10:00Z::102
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/actions/events?cursor=2026-04-15T10:10:00Z::102&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 101
+                        timestamp: '2026-04-15T10:00:00Z'
+                        scope: company
+                        severity: medium
+                        status: success
+                        action: user_role_update
+                        actor: admin@company.com
+                        details:
+                          target_user_id: 13
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/v1/admin/actions/events/{action_id}:
     get:
@@ -2936,11 +3695,21 @@ paths:
   /api/v1/admin/platform/audit/events:
     get:
       operationId: platformAuditEventsList_3
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -2986,6 +3755,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlatformAuditListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 3
+                        timestamp: '2026-04-15T10:20:00Z'
+                        tenant_id: 201
+                        action: tenant_status_change
+                        severity: high
+                        status: success
+                        actor_type: system
+                        message: Tenant moved to active
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T09:20:00Z::2
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=2026-04-15T09:20:00Z::2&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 1
+                        timestamp: '2026-04-15T09:00:00Z'
+                        tenant_id: 201
+                        action: invite_create
+                        severity: medium
+                        status: success
+                        actor_type: user
+                        message: Invite sent to admin@tenant-a.com
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/v1/admin/platform/audit/export:
     get:
@@ -3323,42 +4129,73 @@ paths:
           description: ''
   /api/v1/auth/invite/activate:
     post:
-      operationId: api_v1_auth_invite_activate_create
+      operationId: authInviteActivate_2
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InviteActivate'
       security:
       - cookieAuth: []
       - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteActivateResponse'
+          description: ''
   /api/v1/auth/login:
     post:
-      operationId: api_v1_auth_login_create
+      operationId: authLogin_2
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthLogin'
+        required: true
       security:
       - cookieAuth: []
       - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
   /api/v1/auth/logout:
     post:
-      operationId: api_v1_auth_logout_create
+      operationId: authLogout_2
       tags:
       - api
       security:
       - cookieAuth: []
       - basicAuth: []
       responses:
-        '200':
-          description: No response body
+        '204':
+          description: Logged out
   /api/v1/auth/session:
     get:
-      operationId: api_v1_auth_session_retrieve
+      operationId: authSession_2
       tags:
       - api
       security:
@@ -3366,10 +4203,14 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
   /api/v1/buildings:
     get:
-      operationId: api_v1_buildings_retrieve
+      operationId: buildingsList_2
       tags:
       - api
       security:
@@ -3378,10 +4219,16 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildingListItem'
+          description: ''
   /api/v1/buildings/{building_id}:
     get:
-      operationId: api_v1_buildings_retrieve_2
+      operationId: buildingDetail_2
       parameters:
       - in: path
         name: building_id
@@ -3396,10 +4243,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildingDetail'
+          description: ''
   /api/v1/buildings/{building_id}/departments:
     get:
-      operationId: api_v1_buildings_departments_retrieve
+      operationId: buildingDepartments_2
       parameters:
       - in: path
         name: building_id
@@ -3414,10 +4265,16 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+          description: ''
   /api/v1/buildings/{building_id}/floors/{floor_id}/employees/{employee_id}/profile:
     get:
-      operationId: api_v1_buildings_floors_employees_profile_retrieve
+      operationId: employeeProfileByFloor_2
       parameters:
       - in: path
         name: building_id
@@ -3442,10 +4299,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
   /api/v1/buildings/{building_id}/floors/{floor_id}/workspace:
     get:
-      operationId: api_v1_buildings_floors_workspace_retrieve
+      operationId: floorWorkspace_2
       parameters:
       - in: path
         name: building_id
@@ -3465,13 +4326,22 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+          description: ''
   /api/v1/buildings/{building_id}/floors/{floor_id}/workspace-context:
     get:
-      operationId: api_v1_buildings_floors_workspace_context_retrieve
+      operationId: workspaceContextAlias_2
       parameters:
       - in: path
         name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
         schema:
           type: string
         required: true
@@ -3488,10 +4358,14 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
   /api/v1/buildings/{building_id}/floors/{floor_id}/workspace/employee/{employee_id}:
     get:
-      operationId: api_v1_buildings_floors_workspace_employee_retrieve
+      operationId: employeeWorkspaceContext_2
       parameters:
       - in: path
         name: building_id
@@ -3516,7 +4390,11 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
   /api/v1/chats:
     get:
       operationId: api_v1_chats_list
@@ -3913,9 +4791,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedEmployeeList'
           description: ''
-  /api/v1/employees/{employee_id}/profile:
+  /api/v1/employees/{employee_id}:
     get:
-      operationId: api_v1_employees_profile_retrieve
+      operationId: employeeProfileOwnerOrPublic_2
       parameters:
       - in: path
         name: employee_id
@@ -3927,10 +4805,45 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
+  /api/v1/employees/{employee_id}/profile:
+    get:
+      operationId: employeeProfileGlobalAlias_2
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeProfile'
+          description: ''
   /api/v1/employees/{id}:
     get:
       operationId: api_v1_employees_retrieve
@@ -3951,6 +4864,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Employee'
+          description: ''
+  /api/v1/employees/me:
+    get:
+      operationId: employeeMeProfile_2
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
+          description: ''
+    patch:
+      operationId: employeeMeProfilePatch_2
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMyEmployeeProfile'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeOwnerProfile'
           description: ''
   /api/v1/me:
     get:
@@ -4117,11 +5070,21 @@ paths:
   /api/v1/platform/admin/audit/events:
     get:
       operationId: platformAuditEventsList_4
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: action
         schema:
           type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
       - in: query
         name: from
         schema:
@@ -4167,6 +5130,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlatformAuditListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 3
+                        timestamp: '2026-04-15T10:20:00Z'
+                        tenant_id: 201
+                        action: tenant_status_change
+                        severity: high
+                        status: success
+                        actor_type: system
+                        message: Tenant moved to active
+                      page: 1
+                      page_size: 2
+                      next_cursor: 2026-04-15T09:20:00Z::2
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/admin/platform/audit/events?cursor=2026-04-15T09:20:00Z::2&page_size=2
+                    response:
+                      count: 3
+                      results:
+                      - id: 1
+                        timestamp: '2026-04-15T09:00:00Z'
+                        tenant_id: 201
+                        action: invite_create
+                        severity: medium
+                        status: success
+                        actor_type: user
+                        message: Invite sent to admin@tenant-a.com
+                      page: 1
+                      page_size: 2
+                      next_cursor: null
+                  summary: Second cursor page
           description: ''
   /api/v1/platform/admin/audit/export:
     get:
@@ -4512,7 +5512,7 @@ paths:
           description: ''
   /api/v1/projects/{id}/archive:
     post:
-      operationId: api_v1_projects_archive_create
+      operationId: projectArchive_2
       parameters:
       - in: path
         name: id
@@ -4526,7 +5526,11 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
   /api/v1/projects/{id}/members:
     get:
       operationId: api_v1_projects_members_list
@@ -4606,7 +5610,7 @@ paths:
           description: ''
   /api/v1/projects/{id}/members/{member_id}:
     patch:
-      operationId: api_v1_projects_members_partial_update
+      operationId: projectMemberUpdate_2
       parameters:
       - in: path
         name: id
@@ -4620,14 +5624,29 @@ paths:
         required: true
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectMemberUpdate'
       security:
       - cookieAuth: []
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+          description: ''
     delete:
-      operationId: api_v1_projects_members_destroy
+      operationId: projectMemberDelete_2
       parameters:
       - in: path
         name: id
@@ -4646,10 +5665,10 @@ paths:
       - basicAuth: []
       responses:
         '204':
-          description: No response body
+          description: Project member deleted
   /api/v1/projects/{id}/restore:
     post:
-      operationId: api_v1_projects_restore_create
+      operationId: projectRestore_2
       parameters:
       - in: path
         name: id
@@ -4663,17 +5682,39 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
   /api/v1/tasks:
     get:
       operationId: tasksList_2
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
       - in: query
         name: assignee_id
         schema:
           type: integer
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
         name: department_id
+        schema:
+          type: integer
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
         schema:
           type: integer
       - in: query
@@ -4689,9 +5730,23 @@ paths:
         schema:
           type: string
       - in: query
+        name: sort
+        schema:
+          type: string
+      - in: query
         name: status
         schema:
           type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
       tags:
       - api
       security:
@@ -4703,6 +5758,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks?cursor=&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:21:49.573218Z::2004
+                      results:
+                      - id: 2005
+                        title: Cursor smoke 0
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks?cursor=2026-04-15T12:21:49.573218Z::2004&page_size=2
+                    response:
+                      count: 5
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T10:00:00Z::2002
+                      results:
+                      - id: 2004
+                        title: Cursor smoke 1
+                        description: ''
+                        status: todo
+                        priority: medium
+                        project_id: null
+                        assignee_id: 12
+                        department_id: null
+                        due_date: null
+                        created_at: '2026-04-15T12:21:49.573218Z'
+                        updated_at: '2026-04-15T12:21:49.573218Z'
+                  summary: Second cursor page
           description: ''
     post:
       operationId: tasksCreate_2
@@ -4825,7 +5925,29 @@ paths:
   /api/v1/tasks/{task_id}/activity:
     get:
       operationId: taskActivityList_2
+      description: When `cursor` is provided, endpoint uses cursor pagination with
+        stable ordering (`timestamp/created_at` desc, then `id` desc). When `cursor`
+        is not provided, classic `page/page_size` mode is used.
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: 'Cursor-based pagination token. Format: `YYYY-MM-DDTHH:MM:SSZ::<id>`.
+          Pass empty cursor (`cursor=`) for the first page. Use `next_cursor` from
+          response to request the next page.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
       - in: path
         name: task_id
         schema:
@@ -4842,6 +5964,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskActivityListResponse'
+              examples:
+                CursorRequestExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: 2026-04-15T12:23:54.103397Z::2
+                      results:
+                      - id: 3
+                        task_id: 2003
+                        event_type: updated
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          changed_fields:
+                            status:
+                              from: todo
+                              to: in_progress
+                        created_at: '2026-04-15T12:23:54.103397Z'
+                  summary: First cursor page
+                CursorNextPageExample:
+                  value:
+                    request: /api/tasks/2003/activity?cursor=2026-04-15T12:23:54.103397Z::2&page_size=2
+                    response:
+                      count: 3
+                      page: 1
+                      page_size: 2
+                      num_pages: 1
+                      next_cursor: null
+                      results:
+                      - id: 1
+                        task_id: 2003
+                        event_type: created
+                        actor_id: 1
+                        actor_username: company_admin_test
+                        payload:
+                          status: todo
+                          priority: medium
+                          assignee_id: 12
+                        created_at: '2026-04-15T12:23:54.100000Z'
+                  summary: Second cursor page
           description: ''
         '404':
           content:
@@ -4873,6 +6039,16 @@ paths:
         name: q
         schema:
           type: string
+      - in: query
+        name: updated_at_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updated_at_to
+        schema:
+          type: string
+          format: date-time
       tags:
       - api
       security:
@@ -4964,9 +6140,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/TaskStats'
           description: ''
+  /api/v1/workspace:
+    get:
+      operationId: employeeWorkspaceCabinet
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEmployeeCabinet'
+          description: ''
   /api/v1/workspace/context:
     get:
-      operationId: api_v1_workspace_context_retrieve
+      operationId: workspaceContextGlobalAlias
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       security:
@@ -4975,10 +6182,72 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+  /api/v1/workspace/quick-tasks:
+    post:
+      operationId: workspaceQuickTasksCreate
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickTaskCreateResponse'
+          description: ''
+  /api/workspace:
+    get:
+      operationId: employeeWorkspaceCabinet_2
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEmployeeCabinet'
+          description: ''
   /api/workspace/context:
     get:
-      operationId: api_workspace_context_retrieve
+      operationId: workspaceContextGlobalAlias_2
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: employee_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       security:
@@ -4987,7 +6256,38 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeWorkspaceContext'
+          description: ''
+  /api/workspace/quick-tasks:
+    post:
+      operationId: workspaceQuickTasksCreate_2
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuickTaskCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickTaskCreateResponse'
+          description: ''
   /health/live/:
     get:
       operationId: health_live_retrieve
@@ -5006,6 +6306,22 @@ paths:
           description: No response body
 components:
   schemas:
+    Activity:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        timestamp:
+          type: string
+      required:
+      - id
+      - timestamp
+      - title
+      - type
     ActorTypeEnum:
       enum:
       - user
@@ -5029,7 +6345,7 @@ components:
         severity:
           $ref: '#/components/schemas/SeverityEnum'
         status:
-          $ref: '#/components/schemas/Status80bEnum'
+          $ref: '#/components/schemas/RequestStatusEnum'
         action:
           type: string
         actor:
@@ -5059,8 +6375,12 @@ components:
           type: integer
         page_size:
           type: integer
+        next_cursor:
+          type: string
+          nullable: true
       required:
       - count
+      - next_cursor
       - page
       - page_size
       - results
@@ -5216,6 +6536,74 @@ components:
         * `completed` - Completed
         * `failed` - Failed
         * `canceled` - Canceled
+    AuthLogin:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+      - password
+    BuildingDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+      required:
+      - departments
+      - id
+      - name
+    BuildingListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        floors:
+          type: integer
+        employees:
+          type: integer
+        online_now:
+          type: integer
+        risky_tasks:
+          type: integer
+        overdue_tasks:
+          type: integer
+        color:
+          type: string
+        height_ratio:
+          type: number
+          format: double
+        latest_event:
+          type: string
+        logo:
+          type: string
+      required:
+      - color
+      - employees
+      - floors
+      - height_ratio
+      - id
+      - latest_event
+      - logo
+      - name
+      - online_now
+      - overdue_tasks
+      - risky_tasks
+      - status
     BulkTaskUpdateResponse:
       type: object
       properties:
@@ -5278,6 +6666,22 @@ components:
       required:
       - project
       - title
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        author:
+          type: string
+        text:
+          type: string
+        created_at:
+          type: string
+      required:
+      - author
+      - created_at
+      - id
+      - text
     CompanyAdminOverview:
       type: object
       properties:
@@ -5323,9 +6727,9 @@ components:
           type: string
           format: email
         role:
-          $ref: '#/components/schemas/Role034Enum'
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
         status:
-          $ref: '#/components/schemas/StatusBdfEnum'
+          $ref: '#/components/schemas/InviteStatusEnum'
         created_at:
           type: string
           format: date-time
@@ -5359,6 +6763,26 @@ components:
       required:
       - count
       - results
+    CompanyUserRoleEnum:
+      enum:
+      - employee
+      - manager
+      - company_admin
+      type: string
+      description: |-
+        * `employee` - employee
+        * `manager` - manager
+        * `company_admin` - company_admin
+    CompanyUserStatusEnum:
+      enum:
+      - active
+      - invited
+      - blocked
+      type: string
+      description: |-
+        * `active` - active
+        * `invited` - invited
+        * `blocked` - blocked
     CompanyUserSummary:
       type: object
       properties:
@@ -5370,9 +6794,9 @@ components:
           type: string
           format: email
         role:
-          $ref: '#/components/schemas/Role034Enum'
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
         status:
-          $ref: '#/components/schemas/CompanyUserSummaryStatusEnum'
+          $ref: '#/components/schemas/CompanyUserStatusEnum'
         department_id:
           type: integer
       required:
@@ -5382,16 +6806,6 @@ components:
       - name
       - role
       - status
-    CompanyUserSummaryStatusEnum:
-      enum:
-      - active
-      - invited
-      - blocked
-      type: string
-      description: |-
-        * `active` - active
-        * `invited` - invited
-        * `blocked` - blocked
     CreateCompanyInviteRequest:
       type: object
       properties:
@@ -5400,7 +6814,7 @@ components:
           format: email
         role:
           allOf:
-          - $ref: '#/components/schemas/Role034Enum'
+          - $ref: '#/components/schemas/CompanyUserRoleEnum'
           default: employee
       required:
       - email
@@ -5412,7 +6826,7 @@ components:
           format: email
         role:
           allOf:
-          - $ref: '#/components/schemas/Role62aEnum'
+          - $ref: '#/components/schemas/PlatformRoleEnum'
           default: support
       required:
       - email
@@ -5426,7 +6840,7 @@ components:
           default: ''
         status:
           allOf:
-          - $ref: '#/components/schemas/Status531Enum'
+          - $ref: '#/components/schemas/TaskStatusEnum'
           default: todo
         priority:
           allOf:
@@ -5454,48 +6868,192 @@ components:
           type: string
       required:
       - name
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+        floor:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+        employee_count:
+          type: integer
+        online_count:
+          type: integer
+        risky_tasks:
+          type: integer
+        overdue_tasks:
+          type: integer
+        lead:
+          type: string
+      required:
+      - employee_count
+      - floor
+      - id
+      - lead
+      - name
+      - online_count
+      - overdue_tasks
+      - risky_tasks
+      - status
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        updated_at:
+          type: string
+        owner:
+          type: string
+      required:
+      - id
+      - owner
+      - title
+      - type
+      - updated_at
     Employee:
       type: object
       properties:
         id:
-          type: integer
-          readOnly: true
-        username:
           type: string
-          title: Имя пользователя
-          description: Обязательное поле. Не более 150 символов. Только буквы, цифры
-            и символы @/./+/-/_.
-          pattern: ^[\w.@+-]+$
-          maxLength: 150
-        email:
-          type: string
-          format: email
-          title: Адрес электронной почты
-          maxLength: 254
-        first_name:
-          type: string
-          title: Имя
-          maxLength: 150
-        last_name:
-          type: string
-          title: Фамилия
-          maxLength: 150
         full_name:
           type: string
-          readOnly: true
-        is_active:
-          type: boolean
-          title: Активный
-          description: Отметьте, если пользователь должен считаться активным. Уберите
-            эту отметку вместо удаления учётной записи.
-        date_joined:
+        role:
           type: string
-          format: date-time
-          title: Дата регистрации
+        avatar:
+          type: string
+        status:
+          type: string
+        email:
+          type: string
+        telegram:
+          type: string
+        timezone:
+          type: string
+        hours:
+          type: string
+        x:
+          type: integer
+        y:
+          type: integer
+        points:
+          type: integer
+        next_goal:
+          type: integer
+        next_goal_label:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceTask'
       required:
+      - avatar
+      - email
       - full_name
+      - hours
       - id
-      - username
+      - next_goal
+      - next_goal_label
+      - points
+      - role
+      - status
+      - tasks
+      - telegram
+      - timezone
+      - x
+      - y
+    EmployeeOwnerProfile:
+      type: object
+      properties:
+        view:
+          type: string
+        header: {}
+        contacts: {}
+        performance: {}
+        projects: {}
+        achievements: {}
+        bonus_goals: {}
+        activity_feed: {}
+        comments_history: {}
+        preferences: {}
+        editable_fields: {}
+      required:
+      - achievements
+      - activity_feed
+      - bonus_goals
+      - comments_history
+      - contacts
+      - editable_fields
+      - header
+      - performance
+      - preferences
+      - projects
+      - view
+    EmployeeProfile:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/Employee'
+        building_name:
+          type: string
+        department:
+          type: string
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceProject'
+        activity_feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        comments_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        performance:
+          $ref: '#/components/schemas/Performance'
+      required:
+      - activity_feed
+      - building_name
+      - comments_history
+      - department
+      - employee
+      - performance
+      - projects
+    EmployeeWorkspaceContext:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/Employee'
+        my_tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceTask'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        activity_feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        project_context:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceProject'
+      required:
+      - activity_feed
+      - documents
+      - employee
+      - my_tasks
+      - project_context
     ErrorDetail:
       type: object
       properties:
@@ -5503,6 +7061,37 @@ components:
           type: string
       required:
       - detail
+    InviteActivate:
+      type: object
+      properties:
+        invite_token:
+          type: string
+        token:
+          type: string
+        password:
+          type: string
+    InviteActivateResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        invite_token:
+          type: string
+      required:
+      - detail
+      - invite_token
+    InviteStatusEnum:
+      enum:
+      - pending
+      - accepted
+      - expired
+      - revoked
+      type: string
+      description: |-
+        * `pending` - pending
+        * `accepted` - accepted
+        * `expired` - expired
+        * `revoked` - revoked
     Message:
       type: object
       properties:
@@ -5829,7 +7418,14 @@ components:
           items:
             type: integer
         status:
-          $ref: '#/components/schemas/Status531Enum'
+          $ref: '#/components/schemas/TaskStatusEnum'
+    PatchedProjectMemberUpdate:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+        is_active:
+          type: boolean
     PatchedProjectUpdate:
       type: object
       properties:
@@ -5839,12 +7435,31 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/Status4daEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
     PatchedUpdateCompanyUserRoleRequest:
       type: object
       properties:
         role:
-          $ref: '#/components/schemas/Role034Enum'
+          $ref: '#/components/schemas/CompanyUserRoleEnum'
+    PatchedUpdateMyEmployeeProfile:
+      type: object
+      properties:
+        personal_email:
+          type: string
+          format: email
+        phone:
+          type: string
+        telegram:
+          type: string
+        city:
+          type: string
+        working_hours:
+          type: string
+        timezone:
+          type: string
+        preferences:
+          type: object
+          additionalProperties: {}
     PatchedUpdateTaskRequest:
       type: object
       properties:
@@ -5853,7 +7468,7 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/Status531Enum'
+          $ref: '#/components/schemas/TaskStatusEnum'
         priority:
           $ref: '#/components/schemas/PriorityEnum'
         project_id:
@@ -5872,7 +7487,23 @@ components:
       type: object
       properties:
         status:
-          $ref: '#/components/schemas/Status769Enum'
+          $ref: '#/components/schemas/TenantStatusEnum'
+    Performance:
+      type: object
+      properties:
+        completed_tasks:
+          type: integer
+        total_tasks:
+          type: integer
+        on_time_rate:
+          type: integer
+        response_rate:
+          type: integer
+      required:
+      - completed_tasks
+      - on_time_rate
+      - response_rate
+      - total_tasks
     PlatformAuditEvent:
       type: object
       properties:
@@ -5888,7 +7519,7 @@ components:
         severity:
           $ref: '#/components/schemas/SeverityEnum'
         status:
-          $ref: '#/components/schemas/Status80bEnum'
+          $ref: '#/components/schemas/RequestStatusEnum'
         actor_type:
           $ref: '#/components/schemas/ActorTypeEnum'
         message:
@@ -5915,8 +7546,12 @@ components:
           type: integer
         page_size:
           type: integer
+        next_cursor:
+          type: string
+          nullable: true
       required:
       - count
+      - next_cursor
       - page
       - page_size
       - results
@@ -5942,9 +7577,9 @@ components:
           type: string
           format: email
         role:
-          $ref: '#/components/schemas/Role62aEnum'
+          $ref: '#/components/schemas/PlatformRoleEnum'
         status:
-          $ref: '#/components/schemas/StatusBdfEnum'
+          $ref: '#/components/schemas/InviteStatusEnum'
         created_at:
           type: string
           format: date-time
@@ -5966,6 +7601,16 @@ components:
       required:
       - count
       - results
+    PlatformRoleEnum:
+      enum:
+      - platform_admin
+      - support
+      - security
+      type: string
+      description: |-
+        * `platform_admin` - platform_admin
+        * `support` - support
+        * `security` - security
     PlatformUserListResponse:
       type: object
       properties:
@@ -5989,7 +7634,7 @@ components:
           type: string
           format: email
         role:
-          $ref: '#/components/schemas/Role62aEnum'
+          $ref: '#/components/schemas/PlatformRoleEnum'
       required:
       - email
       - id
@@ -6020,7 +7665,7 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/Status4daEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
         created_by_id:
           type: integer
           readOnly: true
@@ -6050,7 +7695,7 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/Status4daEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
       required:
       - name
       - organization
@@ -6078,7 +7723,7 @@ components:
           type: string
           readOnly: true
         role:
-          $ref: '#/components/schemas/RoleA58Enum'
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
         is_active:
           type: boolean
         joined_at:
@@ -6100,44 +7745,12 @@ components:
         user:
           type: integer
         role:
-          $ref: '#/components/schemas/RoleA58Enum'
+          $ref: '#/components/schemas/ProjectMemberRoleEnum'
         is_active:
           type: boolean
       required:
       - user
-    ProjectUpdate:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 255
-        description:
-          type: string
-        status:
-          $ref: '#/components/schemas/Status4daEnum'
-      required:
-      - name
-    Role034Enum:
-      enum:
-      - employee
-      - manager
-      - company_admin
-      type: string
-      description: |-
-        * `employee` - employee
-        * `manager` - manager
-        * `company_admin` - company_admin
-    Role62aEnum:
-      enum:
-      - platform_admin
-      - support
-      - security
-      type: string
-      description: |-
-        * `platform_admin` - platform_admin
-        * `support` - support
-        * `security` - security
-    RoleA58Enum:
+    ProjectMemberRoleEnum:
       enum:
       - owner
       - editor
@@ -6147,6 +7760,65 @@ components:
         * `owner` - Owner
         * `editor` - Editor
         * `viewer` - Viewer
+    ProjectStatusEnum:
+      enum:
+      - active
+      - on_hold
+      - completed
+      - archived
+      type: string
+      description: |-
+        * `active` - Active
+        * `on_hold` - On Hold
+        * `completed` - Completed
+        * `archived` - Archived
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+      required:
+      - name
+    QuickTaskCreate:
+      type: object
+      properties:
+        title:
+          type: string
+        slot:
+          $ref: '#/components/schemas/SlotEnum'
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        project_id:
+          type: string
+      required:
+      - slot
+      - title
+    QuickTaskCreateResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        slot:
+          type: string
+        title:
+          type: string
+      required:
+      - slot
+      - task_id
+      - title
+    RequestStatusEnum:
+      enum:
+      - success
+      - failed
+      type: string
+      description: |-
+        * `success` - success
+        * `failed` - failed
     ScopeEnum:
       enum:
       - company
@@ -6155,6 +7827,48 @@ components:
       description: |-
         * `company` - company
         * `platform` - platform
+    SessionPayload:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/SessionUser'
+      required:
+      - token
+      - user
+    SessionResponse:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/SessionPayload'
+      required:
+      - session
+    SessionUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Адрес электронной почты
+          maxLength: 254
+        role:
+          type: string
+          readOnly: true
+        department:
+          type: string
+          readOnly: true
+      required:
+      - department
+      - id
+      - name
+      - role
     SeverityEnum:
       enum:
       - low
@@ -6167,58 +7881,16 @@ components:
         * `medium` - medium
         * `high` - high
         * `critical` - critical
-    Status4daEnum:
+    SlotEnum:
       enum:
-      - active
-      - on_hold
-      - completed
-      - archived
+      - today
+      - this_week
+      - later
       type: string
       description: |-
-        * `active` - Active
-        * `on_hold` - On Hold
-        * `completed` - Completed
-        * `archived` - Archived
-    Status531Enum:
-      enum:
-      - todo
-      - in_progress
-      - done
-      type: string
-      description: |-
-        * `todo` - todo
-        * `in_progress` - in_progress
-        * `done` - done
-    Status769Enum:
-      enum:
-      - active
-      - trial
-      - suspended
-      type: string
-      description: |-
-        * `active` - active
-        * `trial` - trial
-        * `suspended` - suspended
-    Status80bEnum:
-      enum:
-      - success
-      - failed
-      type: string
-      description: |-
-        * `success` - success
-        * `failed` - failed
-    StatusBdfEnum:
-      enum:
-      - pending
-      - accepted
-      - expired
-      - revoked
-      type: string
-      description: |-
-        * `pending` - pending
-        * `accepted` - accepted
-        * `expired` - expired
-        * `revoked` - revoked
+        * `today` - today
+        * `this_week` - this_week
+        * `later` - later
     StatusDa1Enum:
       enum:
       - open
@@ -6250,7 +7922,7 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/Status531Enum'
+          $ref: '#/components/schemas/TaskStatusEnum'
         priority:
           $ref: '#/components/schemas/PriorityEnum'
         project_id:
@@ -6316,12 +7988,25 @@ components:
       properties:
         count:
           type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        num_pages:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
         results:
           type: array
           items:
             $ref: '#/components/schemas/TaskActivityEvent'
       required:
       - count
+      - next_cursor
+      - num_pages
+      - page
+      - page_size
       - results
     TaskBoardResponse:
       type: object
@@ -6347,12 +8032,25 @@ components:
       properties:
         count:
           type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        num_pages:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
         results:
           type: array
           items:
             $ref: '#/components/schemas/Task'
       required:
       - count
+      - next_cursor
+      - num_pages
+      - page
+      - page_size
       - results
     TaskStats:
       type: object
@@ -6379,6 +8077,16 @@ components:
       - medium_priority
       - todo
       - total
+    TaskStatusEnum:
+      enum:
+      - todo
+      - in_progress
+      - done
+      type: string
+      description: |-
+        * `todo` - todo
+        * `in_progress` - in_progress
+        * `done` - done
     TenantListResponse:
       type: object
       properties:
@@ -6391,6 +8099,16 @@ components:
       required:
       - count
       - results
+    TenantStatusEnum:
+      enum:
+      - active
+      - trial
+      - suspended
+      type: string
+      description: |-
+        * `active` - active
+        * `trial` - trial
+        * `suspended` - suspended
     TenantSummary:
       type: object
       properties:
@@ -6399,11 +8117,117 @@ components:
         name:
           type: string
         status:
-          $ref: '#/components/schemas/Status769Enum'
+          $ref: '#/components/schemas/TenantStatusEnum'
       required:
       - id
       - name
       - status
+    Workspace:
+      type: object
+      properties:
+        building_name:
+          type: string
+        department:
+          type: string
+        zones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Zone'
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+      required:
+      - building_name
+      - department
+      - employees
+      - zones
+    WorkspaceEmployeeCabinet:
+      type: object
+      properties:
+        employee: {}
+        greeting: {}
+        today_focus: {}
+        quick_actions: {}
+        stats: {}
+        tasks_grouped: {}
+        project_context: {}
+        activity_feed: {}
+        ai_context: {}
+        role_extras: {}
+        viewer_role:
+          type: string
+      required:
+      - activity_feed
+      - ai_context
+      - employee
+      - greeting
+      - project_context
+      - quick_actions
+      - stats
+      - tasks_grouped
+      - today_focus
+      - viewer_role
+    WorkspaceProject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        summary:
+          type: string
+      required:
+      - id
+      - name
+      - status
+      - summary
+    WorkspaceTask:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        column:
+          type: string
+        priority:
+          type: string
+        due:
+          type: string
+      required:
+      - column
+      - due
+      - id
+      - priority
+      - title
+    Zone:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+        w:
+          type: integer
+        h:
+          type: integer
+        label:
+          type: string
+        color:
+          type: string
+        stroke_color:
+          type: string
+      required:
+      - color
+      - h
+      - label
+      - stroke_color
+      - w
+      - x
+      - y
   securitySchemes:
     basicAuth:
       type: http

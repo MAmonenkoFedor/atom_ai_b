@@ -4,12 +4,16 @@ from .views import (
     BuildingDepartmentsView,
     BuildingDetailView,
     BuildingsListView,
+    EmployeeMeProfileView,
+    EmployeeProfileByIdView,
     EmployeeProfileGlobalAliasView,
     EmployeeProfileView,
+    EmployeeWorkspaceCabinetView,
     EmployeeWorkspaceContextView,
     FloorWorkspaceView,
     WorkspaceContextAliasView,
     WorkspaceContextGlobalAliasView,
+    WorkspaceQuickTasksView,
 )
 
 urlpatterns = [
@@ -50,4 +54,8 @@ urlpatterns = [
         EmployeeProfileGlobalAliasView.as_view(),
         name="employee-profile-global-alias",
     ),
+    path("workspace", EmployeeWorkspaceCabinetView.as_view(), name="workspace"),
+    path("employees/me", EmployeeMeProfileView.as_view(), name="employees-me"),
+    path("employees/<str:employee_id>", EmployeeProfileByIdView.as_view(), name="employees-by-id"),
+    path("workspace/quick-tasks", WorkspaceQuickTasksView.as_view(), name="workspace-quick-tasks"),
 ]

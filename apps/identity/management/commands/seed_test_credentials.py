@@ -26,6 +26,46 @@ class Command(BaseCommand):
             code="super_admin",
             defaults={"name": "Super Admin"},
         )
+        role_employee, _ = Role.objects.get_or_create(
+            code="employee",
+            defaults={"name": "Employee"},
+        )
+        role_manager, _ = Role.objects.get_or_create(
+            code="manager",
+            defaults={"name": "Manager"},
+        )
+
+        employee_user, _ = user_model.objects.get_or_create(
+            username="employee_test",
+            defaults={
+                "email": "employee_test@atom.local",
+                "first_name": "Alex",
+                "last_name": "Kim",
+                "is_active": True,
+            },
+        )
+        employee_user.email = "employee_test@atom.local"
+        employee_user.is_active = True
+        employee_user.set_password(password)
+        employee_user.save(
+            update_fields=["email", "is_active", "password", "first_name", "last_name"]
+        )
+
+        manager_user, _ = user_model.objects.get_or_create(
+            username="manager_test",
+            defaults={
+                "email": "manager_test@atom.local",
+                "first_name": "Maria",
+                "last_name": "Smirnova",
+                "is_active": True,
+            },
+        )
+        manager_user.email = "manager_test@atom.local"
+        manager_user.is_active = True
+        manager_user.set_password(password)
+        manager_user.save(
+            update_fields=["email", "is_active", "password", "first_name", "last_name"]
+        )
 
         company_admin, _ = user_model.objects.get_or_create(
             username="company_admin_test",
@@ -61,8 +101,12 @@ class Command(BaseCommand):
 
         UserRole.objects.get_or_create(user=company_admin, role=role_company_admin, organization=None)
         UserRole.objects.get_or_create(user=super_admin, role=role_super_admin, organization=None)
+        UserRole.objects.get_or_create(user=employee_user, role=role_employee, organization=None)
+        UserRole.objects.get_or_create(user=manager_user, role=role_manager, organization=None)
 
         self.stdout.write(self.style.SUCCESS("Test credentials are ready:"))
+        self.stdout.write(f"  employee      -> username: {employee_user.username}")
+        self.stdout.write(f"  manager       -> username: {manager_user.username}")
         self.stdout.write(f"  company_admin -> username: {company_admin.username}")
         self.stdout.write(f"  super_admin   -> username: {super_admin.username}")
         self.stdout.write(f"  password      -> {password}")

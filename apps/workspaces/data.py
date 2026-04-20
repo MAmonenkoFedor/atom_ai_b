@@ -1,4 +1,6 @@
 from copy import deepcopy
+from datetime import datetime, timezone
+from itertools import count
 
 from rest_framework.exceptions import NotFound
 
@@ -154,6 +156,178 @@ EMPLOYEE_PROFILE_EXTRA = {
     }
 }
 
+EMPLOYEE_VERTICAL_DIRECTORY = {
+    "emp-1": {
+        "header": {
+            "id": "emp-1",
+            "full_name": "Alex Kim",
+            "title": "Marketing Lead",
+            "avatar": "https://cdn.atom.ai/assets/avatars/emp-1.png",
+            "department": "Marketing",
+            "status": "online",
+        },
+        "contacts": {
+            "work_email": "alex@company.com",
+            "telegram": "@alex",
+            "personal_email": "alex.personal@gmail.com",
+            "phone": "+79990000001",
+            "city": "Moscow",
+            "working_hours": "10:00 - 19:00",
+            "timezone": "Europe/Moscow",
+            "is_work_email_public": True,
+        },
+        "performance": {
+            "completed_tasks": 12,
+            "total_tasks": 18,
+            "on_time_rate": 67,
+            "response_rate": 92,
+        },
+        "projects": [
+            {"id": "pr-1", "name": "Growth Sprint", "status": "on_track", "summary": "Conversion growing"}
+        ],
+        "achievements": [{"id": "ach-1", "title": "Top contributor", "period": "Q1"}],
+        "bonus_goals": [{"id": "bg-1", "title": "Q2 performance", "progress": 81}],
+        "activity_feed": [
+            {
+                "id": "a1",
+                "type": "task",
+                "title": "Обновлена задача",
+                "timestamp": "2026-04-17T10:00:00Z",
+                "href": "/app/tasks/t1",
+                "actor": {"id": "emp-2", "name": "Maria Smirnova"},
+            }
+        ],
+        "comments_history": [{"id": "cm-1", "author": "Maria Smirnova", "text": "Круто движется!", "created_at": "2026-04-17T09:00:00Z"}],
+        "preferences": {
+            "email_digest": "daily",
+            "task_reminders": True,
+            "mentions_push": True,
+            "ai_suggestions": True,
+        },
+        "editable_fields": [
+            "personal_email",
+            "phone",
+            "telegram",
+            "city",
+            "working_hours",
+            "timezone",
+            "preferences",
+        ],
+    },
+    "emp-2": {
+        "header": {
+            "id": "emp-2",
+            "full_name": "Maria Smirnova",
+            "title": "Marketing Manager",
+            "avatar": "https://cdn.atom.ai/assets/avatars/emp-2.png",
+            "department": "Marketing",
+            "status": "online",
+        },
+        "contacts": {
+            "work_email": "maria@company.com",
+            "telegram": "@maria",
+            "personal_email": "maria.personal@gmail.com",
+            "phone": "+79990000002",
+            "city": "Moscow",
+            "working_hours": "10:00 - 19:00",
+            "timezone": "Europe/Moscow",
+            "is_work_email_public": True,
+        },
+        "performance": {"completed_tasks": 20, "total_tasks": 24, "on_time_rate": 84, "response_rate": 96},
+        "projects": [{"id": "pr-2", "name": "Brand Uplift", "status": "on_track", "summary": "CTR up +12%"}],
+        "achievements": [{"id": "ach-2", "title": "Team mentor", "period": "Q1"}],
+        "bonus_goals": [{"id": "bg-2", "title": "MQL target", "progress": 74}],
+        "activity_feed": [],
+        "comments_history": [],
+        "preferences": {
+            "email_digest": "weekly",
+            "task_reminders": True,
+            "mentions_push": True,
+            "ai_suggestions": False,
+        },
+        "editable_fields": [
+            "personal_email",
+            "phone",
+            "telegram",
+            "city",
+            "working_hours",
+            "timezone",
+            "preferences",
+        ],
+    },
+    "emp-3": {
+        "header": {
+            "id": "emp-3",
+            "full_name": "Company Admin",
+            "title": "Company Admin",
+            "avatar": "https://cdn.atom.ai/assets/avatars/emp-3.png",
+            "department": "Administration",
+            "status": "online",
+        },
+        "contacts": {
+            "work_email": "company_admin_test@atom.local",
+            "telegram": "@company_admin",
+            "personal_email": "company_admin@gmail.com",
+            "phone": "+79990000003",
+            "city": "Moscow",
+            "working_hours": "09:00 - 18:00",
+            "timezone": "Europe/Moscow",
+            "is_work_email_public": False,
+        },
+        "performance": {"completed_tasks": 31, "total_tasks": 33, "on_time_rate": 91, "response_rate": 98},
+        "projects": [{"id": "pr-3", "name": "Ops Control", "status": "on_track", "summary": "Admin SLA stable"}],
+        "achievements": [{"id": "ach-3", "title": "Process owner", "period": "Q1"}],
+        "bonus_goals": [{"id": "bg-3", "title": "Platform stability", "progress": 88}],
+        "activity_feed": [],
+        "comments_history": [],
+        "preferences": {
+            "email_digest": "daily",
+            "task_reminders": True,
+            "mentions_push": True,
+            "ai_suggestions": True,
+        },
+        "editable_fields": [
+            "personal_email",
+            "phone",
+            "telegram",
+            "city",
+            "working_hours",
+            "timezone",
+            "preferences",
+        ],
+    },
+}
+
+USERNAME_TO_EMPLOYEE = {
+    "employee_test": "emp-1",
+    "manager_test": "emp-2",
+    "company_admin_test": "emp-3",
+}
+
+EMPLOYEE_VERTICAL_TASKS = {
+    "emp-1": {
+        "overdue": [
+            {"id": "t-over-1", "title": "Finish KPI deck", "column": "todo", "priority": "high", "due": "2026-04-10"}
+        ],
+        "today": [
+            {"id": "t-today-1", "title": "Review campaign stats", "column": "in_progress", "priority": "medium", "due": "2026-04-17"}
+        ],
+        "this_week": [
+            {"id": "t-week-1", "title": "Prepare roadmap notes", "column": "todo", "priority": "medium", "due": "2026-04-20"}
+        ],
+        "later": [
+            {"id": "t-later-1", "title": "Draft Q3 hypotheses", "column": "todo", "priority": "low", "due": "2026-04-29"}
+        ],
+        "done": [
+            {"id": "t-done-1", "title": "Publish retro notes", "column": "done", "priority": "low", "due": "2026-04-15"}
+        ],
+    },
+    "emp-2": {"overdue": [], "today": [], "this_week": [], "later": [], "done": []},
+    "emp-3": {"overdue": [], "today": [], "this_week": [], "later": [], "done": []},
+}
+
+_quick_task_seq = count(2000)
+
 
 def list_buildings() -> list[dict]:
     return deepcopy(BUILDINGS)
@@ -233,3 +407,174 @@ def get_employee_profile(building_id: str, floor_id: str, employee_id: str) -> d
             )
         ),
     }
+
+
+def resolve_employee_id_for_username(username: str) -> str:
+    return USERNAME_TO_EMPLOYEE.get(username, "emp-1")
+
+
+def _role_extras(role_code: str) -> dict | None:
+    if role_code == "manager":
+        return {"kind": "manager", "team_size": 7, "at_risk_tasks": 1}
+    if role_code == "company_admin":
+        return {"kind": "admin", "alerts": 2, "pending_invites": 1}
+    if role_code == "executive":
+        return {"kind": "executive", "attention_buildings": 1}
+    return None
+
+
+def _grouped_tasks_payload(employee_id: str) -> list[dict]:
+    tasks = EMPLOYEE_VERTICAL_TASKS.get(employee_id, {"overdue": [], "today": [], "this_week": [], "later": [], "done": []})
+    labels = {
+        "overdue": "Просрочено",
+        "today": "Сегодня",
+        "this_week": "На этой неделе",
+        "later": "Позже",
+        "done": "Сделано",
+    }
+    return [{"key": key, "label": labels[key], "tasks": deepcopy(tasks.get(key, []))} for key in ["overdue", "today", "this_week", "later", "done"]]
+
+
+def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
+    profile = deepcopy(EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id))
+    if not profile:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    grouped = _grouped_tasks_payload(employee_id)
+    tasks_count = sum(len(group["tasks"]) for group in grouped)
+    overdue_count = len(next(group["tasks"] for group in grouped if group["key"] == "overdue"))
+    done_count = len(next(group["tasks"] for group in grouped if group["key"] == "done"))
+    result = {
+        "employee": {
+            "id": profile["header"]["id"],
+            "full_name": profile["header"]["full_name"],
+            "role": profile["header"]["title"],
+            "avatar": profile["header"]["avatar"],
+            "status": profile["header"]["status"],
+            "email": profile["contacts"]["work_email"],
+            "telegram": profile["contacts"]["telegram"],
+            "timezone": profile["contacts"]["timezone"],
+            "hours": profile["contacts"]["working_hours"],
+        },
+        "greeting": {
+            "user_name": profile["header"]["full_name"].split(" ")[0],
+            "time_greeting": "Добрый день",
+            "focus_message": "Сегодня закрываем employee vertical.",
+            "ai_tip": "Сфокусируйся на overdue и today задачах.",
+        },
+        "today_focus": {
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "primary_goal": "Закрыть P0 employee vertical",
+            "meetings_count": 2,
+            "tasks_due_today": len(next(group["tasks"] for group in grouped if group["key"] == "today")),
+            "tasks_overdue": overdue_count,
+            "ai_suggestion": "Начни с highest priority overdue задачи.",
+        },
+        "quick_actions": [
+            {"id": "qa-1", "kind": "create_task", "label": "Новая задача"},
+            {"id": "qa-2", "kind": "open_ai", "label": "Спросить AI"},
+            {"id": "qa-3", "kind": "new_note", "label": "Заметка"},
+        ],
+        "stats": {
+            "tasks_in_progress": tasks_count - done_count,
+            "tasks_done": done_count,
+            "tasks_overdue": overdue_count,
+            "streak_days": 4,
+            "week_balance": 78,
+        },
+        "tasks_grouped": grouped,
+        "project_context": deepcopy(profile["projects"]),
+        "activity_feed": deepcopy(profile["activity_feed"]),
+        "ai_context": {
+            "employee_id": employee_id,
+            "open_task_ids": [task["id"] for group in grouped for task in group["tasks"] if task.get("column") != "done"],
+            "suggested_prompts": ["Что в фокусе на сегодня?", "Собери краткий апдейт по задачам."],
+        },
+        "viewer_role": viewer_role,
+    }
+    extras = _role_extras(viewer_role)
+    if extras:
+        result["role_extras"] = extras
+    return result
+
+
+def get_employee_owner_profile(employee_id: str) -> dict:
+    profile = deepcopy(EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id))
+    if not profile:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    return {
+        "view": "owner",
+        "header": profile["header"],
+        "contacts": {k: v for k, v in profile["contacts"].items() if k != "is_work_email_public"},
+        "performance": profile["performance"],
+        "projects": profile["projects"],
+        "achievements": profile["achievements"],
+        "bonus_goals": profile["bonus_goals"],
+        "activity_feed": profile["activity_feed"],
+        "comments_history": profile["comments_history"],
+        "preferences": profile["preferences"],
+        "editable_fields": profile["editable_fields"],
+    }
+
+
+def get_employee_public_profile(employee_id: str) -> dict:
+    profile = deepcopy(EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id))
+    if not profile:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    contacts = {"telegram": profile["contacts"].get("telegram")}
+    if profile["contacts"].get("is_work_email_public"):
+        contacts["work_email"] = profile["contacts"]["work_email"]
+    return {
+        "view": "public",
+        "header": profile["header"],
+        "contacts": contacts,
+        "public_projects": profile["projects"],
+        "public_achievements": profile["achievements"],
+        "public_stats": {
+            "completed_tasks": profile["performance"]["completed_tasks"],
+            "on_time_rate": profile["performance"]["on_time_rate"],
+        },
+    }
+
+
+def patch_employee_owner_profile(employee_id: str, patch: dict) -> dict:
+    profile = EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id)
+    if not profile:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+
+    for key in ["personal_email", "phone", "telegram", "city", "working_hours", "timezone"]:
+        if key in patch:
+            profile["contacts"][key] = patch[key]
+    if "preferences" in patch and isinstance(patch["preferences"], dict):
+        profile["preferences"].update(patch["preferences"])
+    return get_employee_owner_profile(employee_id)
+
+
+def create_workspace_quick_task(employee_id: str, title: str, slot: str, priority: str | None, project_id: str | None) -> dict:
+    if employee_id not in EMPLOYEE_VERTICAL_TASKS:
+        raise NotFound(detail=f"Employee '{employee_id}' not found.")
+    task_id = f"t-{next(_quick_task_seq)}"
+    task = {
+        "id": task_id,
+        "title": title,
+        "column": "todo" if slot != "done" else "done",
+        "priority": priority or "medium",
+        "due": datetime.now(timezone.utc).date().isoformat(),
+    }
+    if slot not in EMPLOYEE_VERTICAL_TASKS[employee_id]:
+        EMPLOYEE_VERTICAL_TASKS[employee_id][slot] = []
+    EMPLOYEE_VERTICAL_TASKS[employee_id][slot].insert(0, task)
+    if project_id:
+        profile = EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id)
+        if profile:
+            profile["activity_feed"].insert(
+                0,
+                {
+                    "id": f"a-{task_id}",
+                    "type": "task",
+                    "title": f"Quick task created for project {project_id}",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "href": f"/app/tasks/{task_id}",
+                    "actor": {"id": employee_id, "name": profile["header"]["full_name"]},
+                },
+            )
+    return {"task_id": task_id, "slot": slot, "title": title}
