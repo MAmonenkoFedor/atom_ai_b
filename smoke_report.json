@@ -1,7 +1,7 @@
 ﻿{
     "mode":  "Full",
     "base_url":  "http://127.0.0.1:8000/api",
-    "generated_at":  "2026-04-20T12:50:28.1887751+03:00",
+    "generated_at":  "2026-04-20T12:53:55.9114802+03:00",
     "total_checks":  113,
     "failed_checks":  0,
     "results":  [
@@ -165,12 +165,12 @@
                         "expected":  "201",
                         "actual":  201,
                         "ok":  true,
-                        "note":  "name=Smoke Runner Project 20260420125023"
+                        "note":  "name=Smoke Runner Project 20260420125351"
                     },
                     {
                         "step":  "project_detail",
                         "method":  "GET",
-                        "path":  "/projects/29",
+                        "path":  "/projects/30",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -179,7 +179,7 @@
                     {
                         "step":  "project_patch",
                         "method":  "PATCH",
-                        "path":  "/projects/29",
+                        "path":  "/projects/30",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -188,7 +188,7 @@
                     {
                         "step":  "project_archive",
                         "method":  "POST",
-                        "path":  "/projects/29/archive",
+                        "path":  "/projects/30/archive",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -197,7 +197,7 @@
                     {
                         "step":  "project_restore",
                         "method":  "POST",
-                        "path":  "/projects/29/restore",
+                        "path":  "/projects/30/restore",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -206,7 +206,7 @@
                     {
                         "step":  "project_members_list",
                         "method":  "GET",
-                        "path":  "/projects/29/members",
+                        "path":  "/projects/30/members",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -215,7 +215,7 @@
                     {
                         "step":  "project_member_create",
                         "method":  "POST",
-                        "path":  "/projects/29/members",
+                        "path":  "/projects/30/members",
                         "expected":  "201",
                         "actual":  201,
                         "ok":  true,
@@ -224,7 +224,7 @@
                     {
                         "step":  "project_member_patch",
                         "method":  "PATCH",
-                        "path":  "/projects/29/members/55",
+                        "path":  "/projects/30/members/57",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -233,7 +233,7 @@
                     {
                         "step":  "project_member_delete",
                         "method":  "DELETE",
-                        "path":  "/projects/29/members/55",
+                        "path":  "/projects/30/members/57",
                         "expected":  "204",
                         "actual":  204,
                         "ok":  true,
@@ -368,7 +368,7 @@
                     {
                         "step":  "task_detail",
                         "method":  "GET",
-                        "path":  "/tasks/2004",
+                        "path":  "/tasks/2006",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -377,7 +377,7 @@
                     {
                         "step":  "task_patch",
                         "method":  "PATCH",
-                        "path":  "/tasks/2004",
+                        "path":  "/tasks/2006",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -422,7 +422,7 @@
                     {
                         "step":  "task_activity_list",
                         "method":  "GET",
-                        "path":  "/tasks/2004/activity?page=1\u0026page_size=5",
+                        "path":  "/tasks/2006/activity?page=1\u0026page_size=5",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -431,7 +431,7 @@
                     {
                         "step":  "task_activity_cursor_invalid",
                         "method":  "GET",
-                        "path":  "/tasks/2004/activity?cursor=invalid\u0026page_size=2",
+                        "path":  "/tasks/2006/activity?cursor=invalid\u0026page_size=2",
                         "expected":  "400",
                         "actual":  400,
                         "ok":  true,
@@ -440,7 +440,7 @@
                     {
                         "step":  "task_delete",
                         "method":  "DELETE",
-                        "path":  "/tasks/2004",
+                        "path":  "/tasks/2006",
                         "expected":  "204",
                         "actual":  204,
                         "ok":  true,
@@ -449,7 +449,7 @@
                     {
                         "step":  "task_detail_after_delete",
                         "method":  "GET",
-                        "path":  "/tasks/2004",
+                        "path":  "/tasks/2006",
                         "expected":  "404",
                         "actual":  404,
                         "ok":  true,
@@ -620,7 +620,7 @@
                     {
                         "step":  "company_invite_revoke",
                         "method":  "POST",
-                        "path":  "/company/admin/invites/1001/revoke",
+                        "path":  "/company/admin/invites/1003/revoke",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -647,7 +647,7 @@
                     {
                         "step":  "alias_company_invite_revoke",
                         "method":  "POST",
-                        "path":  "/admin/company/invites/1002/revoke",
+                        "path":  "/admin/company/invites/1004/revoke",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -881,7 +881,7 @@
                     {
                         "step":  "platform_tenant_status_patch",
                         "method":  "PATCH",
-                        "path":  "/admin/platform/tenants/301/status",
+                        "path":  "/admin/platform/tenants/302/status",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -890,7 +890,7 @@
                     {
                         "step":  "alias_platform_tenant_status_patch",
                         "method":  "PATCH",
-                        "path":  "/platform/admin/tenants/301/status",
+                        "path":  "/platform/admin/tenants/302/status",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -899,7 +899,7 @@
                     {
                         "step":  "platform_tenant_status_patch_invalid_status",
                         "method":  "PATCH",
-                        "path":  "/admin/platform/tenants/301/status",
+                        "path":  "/admin/platform/tenants/302/status",
                         "expected":  "400",
                         "actual":  400,
                         "ok":  true,
@@ -935,7 +935,7 @@
                     {
                         "step":  "platform_invite_revoke",
                         "method":  "POST",
-                        "path":  "/admin/platform/invites/2001/revoke",
+                        "path":  "/admin/platform/invites/2003/revoke",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
@@ -962,7 +962,7 @@
                     {
                         "step":  "alias_platform_invite_revoke",
                         "method":  "POST",
-                        "path":  "/platform/admin/invites/2002/revoke",
+                        "path":  "/platform/admin/invites/2004/revoke",
                         "expected":  "200",
                         "actual":  200,
                         "ok":  true,
