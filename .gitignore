@@ -13,3 +13,23 @@ media/
 *.log
 .idea/
 .vscode/
+
+# Local debug / QA / smoke artefacts (API dumps, cookies, scratch files)
+# Do NOT commit raw API responses or session cookies to the repository.
+*.cookie
+*.cookies.txt
+smoke_report.json
+session.json
+login.json
+ctx.json
+profile.json
+workspace.json
+buildings.json
+building_detail.json
+departments.json
+alias*.json
+
+# Coverage / reports
+htmlcov/
+.coverage
+coverage.xml
