@@ -14,6 +14,20 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="unsafe-dev-secret")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
 CORS_ALLOWED_ORIGINS = env.list("DJANGO_CORS_ALLOWED_ORIGINS", default=[])
+CORS_EXPOSE_HEADERS = ["X-Request-Id"]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-request-id",
+    "x-trace-id",
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -36,9 +50,12 @@ INSTALLED_APPS = [
     "apps.ai",
     "apps.llm_gateway",
     "apps.audit",
+    "apps.storage",
+    "apps.access",
 ]
 
 MIDDLEWARE = [
+    "apps.core.middleware.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -155,6 +172,104 @@ GEMINI_BASE_URL = env(
     "GEMINI_BASE_URL",
     default="https://generativelanguage.googleapis.com/v1beta",
 )
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+DEFAULT_AI_MODEL = env("DEFAULT_AI_MODEL", default="openai/gpt-4o-mini")
+AI_CHAT_MAX_TOKENS = env.int("AI_CHAT_MAX_TOKENS", default=800)
+AI_CHAT_HISTORY_LIMIT = env.int("AI_CHAT_HISTORY_LIMIT", default=20)
+AI_CHAT_RATE_LIMIT_USER_PER_MINUTE = env.int("AI_CHAT_RATE_LIMIT_USER_PER_MINUTE", default=20)
+AI_CHAT_RATE_LIMIT_COMPANY_PER_MINUTE = env.int("AI_CHAT_RATE_LIMIT_COMPANY_PER_MINUTE", default=120)
+AI_SYSTEM_PROMPT = env(
+    "AI_SYSTEM_PROMPT",
+    default=(
+        "You are the ATOM AI assistant. Give concise, actionable and safe responses. "
+        "Use only provided context and chat history."
+    ),
+)
+
+# Curated whitelist of OpenRouter model ids that users can pick from in the chat.
+# Keep this intentionally small — super-admin can extend it as the platform matures.
+# Any model id passed by the frontend is validated against this list.
+AI_CHAT_ALLOWED_MODELS = [
+    {
+        "id": "openai/gpt-4o-mini",
+        "name": "GPT-4o mini",
+        "provider": "OpenAI",
+        "specialty": "Быстрая и универсальная",
+        "description": (
+            "Бюджетная модель для ежедневных задач: короткие ответы, "
+            "резюме, классификация, быстрые черновики."
+        ),
+        "is_default": True,
+        "context_tokens": 128000,
+    },
+    {
+        "id": "openai/gpt-4o",
+        "name": "GPT-4o",
+        "provider": "OpenAI",
+        "specialty": "Умный универсал",
+        "description": "Сильная общая модель: аналитика, код, длинные инструкции.",
+        "is_default": False,
+        "context_tokens": 128000,
+    },
+    {
+        "id": "anthropic/claude-3.5-sonnet",
+        "name": "Claude 3.5 Sonnet",
+        "provider": "Anthropic",
+        "specialty": "Длинный контекст",
+        "description": "Хорош на больших документах, договорах и аккуратной аналитике.",
+        "is_default": False,
+        "context_tokens": 200000,
+    },
+    {
+        "id": "anthropic/claude-3.5-haiku",
+        "name": "Claude 3.5 Haiku",
+        "provider": "Anthropic",
+        "specialty": "Лёгкая и быстрая",
+        "description": "Дешёвая модель Anthropic для простых ответов и классификации.",
+        "is_default": False,
+        "context_tokens": 200000,
+    },
+    {
+        "id": "google/gemini-2.0-flash-001",
+        "name": "Gemini 2.0 Flash",
+        "provider": "Google",
+        "specialty": "Мультимодальная",
+        "description": "Быстрая Google-модель с поддержкой картинок и длинного контекста.",
+        "is_default": False,
+        "context_tokens": 1000000,
+    },
+    {
+        "id": "meta-llama/llama-3.3-70b-instruct",
+        "name": "Llama 3.3 70B",
+        "provider": "Meta",
+        "specialty": "Открытая модель",
+        "description": "Сильная open-source альтернатива, подходит для внутренних задач.",
+        "is_default": False,
+        "context_tokens": 128000,
+    },
+    {
+        "id": "mistralai/mistral-large-latest",
+        "name": "Mistral Large",
+        "provider": "Mistral",
+        "specialty": "Европейский провайдер",
+        "description": "Сильная модель Mistral: хороший русский/французский, рассуждения.",
+        "is_default": False,
+        "context_tokens": 128000,
+    },
+    {
+        "id": "deepseek/deepseek-chat",
+        "name": "DeepSeek Chat",
+        "provider": "DeepSeek",
+        "specialty": "Бюджетный reasoning",
+        "description": "Дешёвая модель с хорошим качеством для кода и логических задач.",
+        "is_default": False,
+        "context_tokens": 64000,
+    },
+]
+
+# Optional Fernet key (urlsafe base64). Empty → derive from SECRET_KEY (rotate = re-enter provider secrets).
+STORAGE_CREDENTIALS_FERNET_KEY = env("STORAGE_CREDENTIALS_FERNET_KEY", default="")
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:

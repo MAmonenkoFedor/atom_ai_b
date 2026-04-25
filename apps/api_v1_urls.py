@@ -9,4 +9,7 @@ urlpatterns = [
     path("", include("apps.projects.api.urls")),
     path("", include("apps.chats.api.urls")),
     path("", include("apps.ai.api.urls")),
+    path("", include("apps.audit.api.urls")),
+    path("", include("apps.storage.api.urls")),
+    path("access/", include("apps.access.api.urls")),
 ]

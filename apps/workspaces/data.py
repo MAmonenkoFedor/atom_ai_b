@@ -1,8 +1,13 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from itertools import count
-
 from rest_framework.exceptions import NotFound, ValidationError
+
+# Same-origin paths: served by Vite `public/` (SPA host), avoids dead `cdn.atom.ai` in local dev.
+_AVATAR_EMP_1 = "/avatars/emp-1.svg"
+_AVATAR_EMP_2 = "/avatars/emp-2.svg"
+_AVATAR_EMP_3 = "/avatars/emp-3.svg"
+_LOGO_BCS_DRIFT = "/avatars/building-bcs-drift.svg"
 
 BUILDINGS = [
     {
@@ -17,7 +22,7 @@ BUILDINGS = [
         "color": "#0EA5E9",
         "height_ratio": 0.72,
         "latest_event": "Q2 board prep",
-        "logo": "https://cdn.atom.ai/assets/bcs-drift-logo.png",
+        "logo": _LOGO_BCS_DRIFT,
     }
 ]
 
@@ -57,7 +62,7 @@ FLOOR_WORKSPACES = {
                 "id": "emp-1",
                 "full_name": "Alex Kim",
                 "role": "Marketing Lead",
-                "avatar": "https://cdn.atom.ai/assets/avatars/emp-1.png",
+                "avatar": _AVATAR_EMP_1,
                 "status": "online",
                 "email": "alex@example.com",
                 "telegram": "@alex",
@@ -100,6 +105,7 @@ EMPLOYEE_CONTEXT = {
                 "type": "doc",
                 "updated_at": "2026-04-14T07:42:00Z",
                 "owner": "Alex K",
+                "href": "",
             }
         ],
         "activity_feed": [
@@ -163,9 +169,11 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "full_name": "Alex Kim",
             "role": "employee",
             "title": "Marketing Lead",
-            "avatar": "https://cdn.atom.ai/assets/avatars/emp-1.png",
+            "avatar": _AVATAR_EMP_1,
             "department": "Marketing",
             "status": "online",
+            "presence_status": "online",
+            "work_status": "on_track",
         },
         "contacts": {
             "work_email": "alex@company.com",
@@ -213,6 +221,8 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "working_hours",
             "timezone",
             "preferences",
+            "presence_status",
+            "work_status",
         ],
     },
     "emp-2": {
@@ -221,9 +231,11 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "full_name": "Maria Smirnova",
             "role": "manager",
             "title": "Marketing Manager",
-            "avatar": "https://cdn.atom.ai/assets/avatars/emp-2.png",
+            "avatar": _AVATAR_EMP_2,
             "department": "Marketing",
             "status": "online",
+            "presence_status": "online",
+            "work_status": "on_track",
         },
         "contacts": {
             "work_email": "maria@company.com",
@@ -255,6 +267,8 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "working_hours",
             "timezone",
             "preferences",
+            "presence_status",
+            "work_status",
         ],
     },
     "emp-3": {
@@ -263,9 +277,11 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "full_name": "Company Admin",
             "role": "company_admin",
             "title": "Company Admin",
-            "avatar": "https://cdn.atom.ai/assets/avatars/emp-3.png",
+            "avatar": _AVATAR_EMP_3,
             "department": "Administration",
             "status": "online",
+            "presence_status": "online",
+            "work_status": "on_track",
         },
         "contacts": {
             "work_email": "company_admin_test@atom.local",
@@ -297,6 +313,8 @@ EMPLOYEE_VERTICAL_DIRECTORY = {
             "working_hours",
             "timezone",
             "preferences",
+            "presence_status",
+            "work_status",
         ],
     },
 }
@@ -329,7 +347,140 @@ EMPLOYEE_VERTICAL_TASKS = {
     "emp-3": {"overdue": [], "today": [], "this_week": [], "later": [], "done": []},
 }
 
+
+def _assignee_fields(employee_id: str) -> dict[str, str]:
+    profile = EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id)
+    if not profile:
+        return {
+            "employee_id": employee_id,
+            "employee_name": "Unknown",
+            "employee_role": "Unknown",
+        }
+    header = profile["header"]
+    display_role = header.get("title") or header.get("role") or "employee"
+    return {
+        "employee_id": str(header.get("id", employee_id)),
+        "employee_name": str(header.get("full_name", "Unknown")),
+        "employee_role": str(display_role),
+    }
+
+
+def with_task_assignee(employee_id: str, task: dict) -> dict:
+    merged = deepcopy(task)
+    merged.update(_assignee_fields(employee_id))
+    return merged
+
+
 _quick_task_seq = count(2000)
+_task_meta_seq = count(1)
+_TASK_THREADS: dict[str, dict[str, list]] = {}
+
+
+def _task_thread_key(employee_id: str, task_id: str) -> str:
+    return f"{employee_id}::{task_id}"
+
+
+def _drop_task_thread(employee_id: str, task_id: str) -> None:
+    _TASK_THREADS.pop(_task_thread_key(employee_id, task_id), None)
+
+
+def _ensure_task_thread(employee_id: str, task_id: str) -> dict[str, list]:
+    get_workspace_task(employee_id, task_id)
+    key = _task_thread_key(employee_id, task_id)
+    if key not in _TASK_THREADS:
+        _TASK_THREADS[key] = {"comments": [], "checklist": [], "audit": []}
+    return _TASK_THREADS[key]
+
+
+def append_workspace_task_audit(
+    employee_id: str,
+    task_id: str,
+    action: str,
+    actor_name: str,
+    actor_role: str = "employee",
+    details: str = "",
+) -> None:
+    thread = _ensure_task_thread(employee_id, task_id)
+    event_id = f"a-{next(_task_meta_seq)}"
+    thread["audit"].insert(
+        0,
+        {
+            "id": event_id,
+            "action": action,
+            "actor_name": actor_name,
+            "actor_role": actor_role,
+            "timestamp": _iso_z_now(),
+            "details": details,
+        },
+    )
+
+
+def list_workspace_task_audit_events(employee_id: str, task_id: str) -> dict:
+    thread = _ensure_task_thread(employee_id, task_id)
+    items = deepcopy(thread["audit"])
+    return {"results": items, "count": len(items)}
+
+
+def list_workspace_task_comments(employee_id: str, task_id: str) -> dict:
+    thread = _ensure_task_thread(employee_id, task_id)
+    items = deepcopy(thread["comments"])
+    return {"results": items, "count": len(items)}
+
+
+def add_workspace_task_comment(employee_id: str, task_id: str, message: str, author_name: str, author_role: str) -> None:
+    thread = _ensure_task_thread(employee_id, task_id)
+    cid = f"c-{next(_task_meta_seq)}"
+    thread["comments"].insert(
+        0,
+        {
+            "id": cid,
+            "message": message.strip(),
+            "author_name": author_name,
+            "author_role": author_role,
+            "created_at": _iso_z_now(),
+        },
+    )
+
+
+def list_workspace_task_checklist(employee_id: str, task_id: str) -> dict:
+    thread = _ensure_task_thread(employee_id, task_id)
+    items = deepcopy(thread["checklist"])
+    items.sort(key=lambda row: int(row.get("position", 0)))
+    return {"results": items, "count": len(items)}
+
+
+def add_workspace_task_checklist_item(employee_id: str, task_id: str, title: str) -> None:
+    thread = _ensure_task_thread(employee_id, task_id)
+    positions = [int(x.get("position", 0)) for x in thread["checklist"]]
+    next_pos = max(positions, default=0) + 1
+    iid = f"cl-{next(_task_meta_seq)}"
+    thread["checklist"].append(
+        {"id": iid, "title": title.strip(), "done": False, "position": next_pos},
+    )
+
+
+def patch_workspace_task_checklist_item(employee_id: str, task_id: str, item_id: str, payload: dict) -> None:
+    thread = _ensure_task_thread(employee_id, task_id)
+    for item in thread["checklist"]:
+        if str(item.get("id")) != str(item_id):
+            continue
+        if "title" in payload and payload["title"] is not None:
+            item["title"] = str(payload["title"]).strip()
+        if "done" in payload and payload["done"] is not None:
+            item["done"] = bool(payload["done"])
+        if "position" in payload and payload["position"] is not None:
+            item["position"] = int(payload["position"])
+        return
+    raise NotFound(detail="Checklist item not found.")
+
+
+def delete_workspace_task_checklist_item(employee_id: str, task_id: str, item_id: str) -> None:
+    thread = _ensure_task_thread(employee_id, task_id)
+    for idx, item in enumerate(list(thread["checklist"])):
+        if str(item.get("id")) == str(item_id):
+            thread["checklist"].pop(idx)
+            return
+    raise NotFound(detail="Checklist item not found.")
 
 
 def _iso_z_now() -> str:
@@ -381,9 +532,10 @@ def get_employee_workspace_context(building_id: str, floor_id: str, employee_id:
     employee = _get_employee_from_workspace(building_id, floor_id, employee_id)
     key = (building_id, str(floor_id), employee_id)
     extra = EMPLOYEE_CONTEXT.get(key, {})
+    my_tasks_raw = deepcopy(extra.get("my_tasks", []))
     return {
         "employee": employee,
-        "my_tasks": deepcopy(extra.get("my_tasks", [])),
+        "my_tasks": [with_task_assignee(employee_id, t) for t in my_tasks_raw],
         "documents": deepcopy(extra.get("documents", [])),
         "activity_feed": deepcopy(extra.get("activity_feed", [])),
         "project_context": deepcopy(extra.get("project_context", [])),
@@ -425,9 +577,21 @@ def _role_extras(role_code: str) -> dict | None:
         return {"kind": "manager", "team_size": 7, "at_risk_tasks": 1}
     if role_code == "company_admin":
         return {"kind": "admin", "alerts": 2, "pending_invites": 1}
-    if role_code == "executive":
+    if role_code in {"executive", "ceo"}:
         return {"kind": "executive", "attention_buildings": 1}
     return None
+
+
+def _count_workspace_tasks_with_column(employee_id: str, column: str) -> int:
+    grouped = EMPLOYEE_VERTICAL_TASKS.get(employee_id)
+    if not grouped:
+        return 0
+    n = 0
+    for tasks in grouped.values():
+        for task in tasks:
+            if str(task.get("column")) == column:
+                n += 1
+    return n
 
 
 def _grouped_tasks_payload(employee_id: str) -> list[dict]:
@@ -439,15 +603,26 @@ def _grouped_tasks_payload(employee_id: str) -> list[dict]:
         "later": "Позже",
         "done": "Сделано",
     }
-    return [{"key": key, "label": labels[key], "tasks": deepcopy(tasks.get(key, []))} for key in ["overdue", "today", "this_week", "later", "done"]]
+    return [
+        {
+            "key": key,
+            "label": labels[key],
+            "tasks": [with_task_assignee(employee_id, t) for t in tasks.get(key, [])],
+        }
+        for key in ["overdue", "today", "this_week", "later", "done"]
+    ]
 
 
-def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
+def get_employee_workspace(request, viewer_role: str) -> dict:
+    from apps.projects import project_documents as project_documents_service
+    from apps.projects.models import ProjectMember
+    from apps.storage.warnings import collect_storage_warnings_for_user, storage_backend_hint
+
+    employee_id = resolve_employee_id_for_username(request.user.username)
     profile = deepcopy(EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id))
     if not profile:
         raise NotFound(detail=f"Employee '{employee_id}' not found.")
     grouped = _grouped_tasks_payload(employee_id)
-    tasks_count = sum(len(group["tasks"]) for group in grouped)
     overdue_count = len(next(group["tasks"] for group in grouped if group["key"] == "overdue"))
     done_count = len(next(group["tasks"] for group in grouped if group["key"] == "done"))
     result = {
@@ -479,18 +654,26 @@ def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
             "ai_suggestion": "Начни с highest priority overdue задачи.",
         },
         "quick_actions": [
-            {"id": "qa-1", "kind": "create_task", "label": "Новая задача"},
-            {"id": "qa-2", "kind": "open_ai", "label": "Спросить AI"},
-            {"id": "qa-3", "kind": "new_note", "label": "Заметка"},
+            {"id": "qa-1", "kind": "create_task", "label": "Новая задача", "icon": "plus-square"},
+            {"id": "qa-2", "kind": "open_ai", "label": "Спросить AI", "icon": "sparkles"},
+            {"id": "qa-3", "kind": "new_note", "label": "Заметка", "icon": "notebook-pen"},
+            {
+                "id": "qa-4",
+                "kind": "open_profile",
+                "label": "Мой профиль",
+                "description": "Контакты и настройки",
+                "icon": "user",
+            },
         ],
         "stats": {
-            "tasks_in_progress": tasks_count - done_count,
+            "tasks_in_progress": _count_workspace_tasks_with_column(employee_id, "in_progress"),
             "tasks_done": done_count,
             "tasks_overdue": overdue_count,
             "streak_days": 4,
-            "week_balance": 78,
+            "week_balance": {"planned_hours": 40, "logged_hours": 31},
         },
         "tasks_grouped": grouped,
+        "documents": project_documents_service.list_project_documents_for_workspace(request),
         "project_context": deepcopy(profile["projects"]),
         "activity_feed": deepcopy(profile["activity_feed"]),
         "ai_context": {
@@ -505,7 +688,30 @@ def get_employee_workspace(employee_id: str, viewer_role: str) -> dict:
             "timestamp_format": "iso-8601-z",
             "header_role_source_of_truth": "header.role",
         },
+        "storage_hints": {
+            "warnings": collect_storage_warnings_for_user(request.user),
+            "backend": storage_backend_hint(),
+        },
     }
+    invites = (
+        ProjectMember.objects.filter(user=request.user, is_active=False)
+        .select_related("project", "project__created_by")
+        .order_by("-joined_at")[:20]
+    )
+    result["project_membership_invites"] = [
+        {
+            "id": m.pk,
+            "project_id": str(m.project_id),
+            "project_name": m.project.name,
+            "role": m.role,
+            "invited_by_name": (
+                (m.project.created_by.get_full_name() or m.project.created_by.username or "").strip()
+                if m.project.created_by
+                else ""
+            ),
+        }
+        for m in invites
+    ]
     extras = _role_extras(viewer_role)
     if extras:
         result["role_extras"] = extras
@@ -567,6 +773,12 @@ def patch_employee_owner_profile(employee_id: str, patch: dict) -> dict:
             profile["contacts"][key] = patch[key]
     if "preferences" in patch and isinstance(patch["preferences"], dict):
         profile["preferences"].update(patch["preferences"])
+    if "presence_status" in patch:
+        v = patch["presence_status"]
+        profile["header"]["presence_status"] = v
+        profile["header"]["status"] = v
+    if "work_status" in patch:
+        profile["header"]["work_status"] = patch["work_status"]
     return get_employee_owner_profile(employee_id)
 
 
@@ -581,6 +793,7 @@ def create_workspace_quick_task(employee_id: str, title: str, slot: str, priorit
         "priority": priority or "medium",
         "due": _iso_z_now(),
     }
+    task = {**task, **_assignee_fields(employee_id)}
     if slot not in EMPLOYEE_VERTICAL_TASKS[employee_id]:
         EMPLOYEE_VERTICAL_TASKS[employee_id][slot] = []
     EMPLOYEE_VERTICAL_TASKS[employee_id][slot].insert(0, task)
@@ -626,13 +839,13 @@ def list_workspace_tasks(employee_id: str, filters: dict | None = None) -> list[
         items = [t for t in items if t.get("column") == column]
     if priority:
         items = [t for t in items if t.get("priority") == priority]
-    return items
+    return [with_task_assignee(employee_id, t) for t in items]
 
 
 def get_workspace_task(employee_id: str, task_id: str) -> dict:
     for task in _all_employee_tasks(employee_id):
         if str(task.get("id")) == str(task_id):
-            return task
+            return with_task_assignee(employee_id, task)
     raise NotFound(detail="Task not found.")
 
 
@@ -660,8 +873,9 @@ def create_workspace_task(employee_id: str, payload: dict) -> dict:
     EMPLOYEE_VERTICAL_TASKS.setdefault(employee_id, {"overdue": [], "today": [], "this_week": [], "later": [], "done": []})
     target_group = "done" if column == "done" else "today"
     EMPLOYEE_VERTICAL_TASKS[employee_id].setdefault(target_group, [])
-    EMPLOYEE_VERTICAL_TASKS[employee_id][target_group].insert(0, task)
-    return task
+    merged = {**task, **_assignee_fields(employee_id)}
+    EMPLOYEE_VERTICAL_TASKS[employee_id][target_group].insert(0, merged)
+    return with_task_assignee(employee_id, merged)
 
 
 def patch_workspace_task(employee_id: str, task_id: str, payload: dict) -> dict:
@@ -695,7 +909,7 @@ def patch_workspace_task(employee_id: str, task_id: str, payload: dict) -> dict:
                 tasks.remove(task)
                 grouped.setdefault("today", [])
                 grouped["today"].insert(0, task)
-            return deepcopy(task)
+            return with_task_assignee(employee_id, task)
     raise NotFound(detail="Task not found.")
 
 
@@ -709,3 +923,35 @@ def delete_workspace_task(employee_id: str, task_id: str) -> None:
                 tasks.remove(task)
                 return
     raise NotFound(detail="Task not found.")
+
+
+def _seed_demo_workspace_task_threads() -> None:
+    ts = "2026-04-10T09:00:00Z"
+    _TASK_THREADS[_task_thread_key("emp-1", "t-over-1")] = {
+        "audit": [
+            {
+                "id": "audit-seed-1",
+                "action": "created",
+                "actor_name": "Alex Kim",
+                "actor_role": "employee",
+                "timestamp": ts,
+                "details": "Демо: задача из seed-данных",
+            },
+        ],
+        "comments": [
+            {
+                "id": "c-seed-1",
+                "message": "Уточнить слайды для KPI",
+                "author_name": "Alex Kim",
+                "author_role": "employee",
+                "created_at": ts,
+            },
+        ],
+        "checklist": [
+            {"id": "cl-seed-1", "title": "Собрать метрики", "done": False, "position": 1},
+            {"id": "cl-seed-2", "title": "Согласовать с PM", "done": True, "position": 2},
+        ],
+    }
+
+
+_seed_demo_workspace_task_threads()

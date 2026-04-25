@@ -13,7 +13,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--password",
-            default="Pass12345!",
+            default="AtomTest123!",
             help="Password for all seeded users.",
         )
 

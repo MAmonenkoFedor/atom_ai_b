@@ -34,10 +34,10 @@
 
 ## 4) Тестовые креды
 
-- `employee_test / Pass12345!`
-- `manager_test / Pass12345!`
-- `company_admin_test / Pass12345!`
-- `super_admin_test / Pass12345!`
+- `employee_test / AtomTest123!`
+- `manager_test / AtomTest123!`
+- `company_admin_test / AtomTest123!`
+- `super_admin_test / AtomTest123!`
 
 ## 5) Контракт v1 для frontend
 

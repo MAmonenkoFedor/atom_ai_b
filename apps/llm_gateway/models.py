@@ -6,6 +6,7 @@ class LlmProvider(models.Model):
     name = models.CharField(max_length=128)
     is_active = models.BooleanField(default=True)
     priority = models.IntegerField(default=100)
+    mock_override = models.BooleanField(null=True, blank=True, default=None)
     config = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

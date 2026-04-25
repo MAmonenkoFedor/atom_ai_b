@@ -16,6 +16,8 @@ class Organization(models.Model):
 
 
 class OrganizationMember(models.Model):
+    """Членство в организации. job_title — должность/роль в компании (напр. «дизайнер»), может быть пустым."""
+
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,

@@ -174,7 +174,11 @@ class LlmGatewayService:
                 error_message = ""
                 result = None
                 try:
-                    result = adapter.generate(prompt=prompt, model_code=route.model.code)
+                    result = adapter.generate(
+                        prompt=prompt,
+                        model_code=route.model.code,
+                        provider=route.provider,
+                    )
                     elapsed_ms = int((time.perf_counter() - started) * 1000)
                     if elapsed_ms > timeout_ms:
                         raise TimeoutError(

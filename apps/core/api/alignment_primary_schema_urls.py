@@ -13,6 +13,9 @@ from apps.projects.api.views import (
     ProjectListView,
     ProjectMemberDetailView,
     ProjectMembersView,
+    ProjectResourceRequestCompanyListView,
+    ProjectResourceRequestCreateView,
+    ProjectResourceRequestResolveView,
     ProjectRestoreView,
 )
 from apps.workspaces.api.views import (
@@ -27,17 +30,30 @@ from apps.workspaces.api.views import (
     EmployeeWorkspaceContextView,
     FloorWorkspaceView,
     WorkspaceTaskAliasDetailView,
+    WorkspaceTaskAuditView,
+    WorkspaceTaskChecklistItemView,
+    WorkspaceTaskChecklistView,
+    WorkspaceTaskCommentsView,
     WorkspaceTasksAliasView,
     WorkspaceQuickTasksView,
+    WorkspaceTaskBuildingAuditView,
+    WorkspaceTaskBuildingChecklistItemView,
+    WorkspaceTaskBuildingChecklistView,
+    WorkspaceTaskBuildingCommentsView,
     WorkspaceContextAliasView,
     WorkspaceContextGlobalAliasView,
+)
+
+from apps.orgstructure.api.company_admin_departments import (
+    CompanyAdminDepartmentDetailView,
+    CompanyAdminDepartmentLeadView,
+    CompanyAdminDepartmentsView,
 )
 
 from .parallel_contract_views import (
     AdminActionDetailView,
     AdminActionEventsView,
     AdminActionStatsView,
-    CompanyAdminDepartmentsView,
     CompanyAdminInviteRevokeView,
     CompanyAdminInvitesView,
     CompanyAdminOverviewView,
@@ -80,6 +96,22 @@ urlpatterns = [
         EmployeeProfileView.as_view(),
     ),
     path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/audit",
+        WorkspaceTaskBuildingAuditView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/comments",
+        WorkspaceTaskBuildingCommentsView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist",
+        WorkspaceTaskBuildingChecklistView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist/<str:item_id>",
+        WorkspaceTaskBuildingChecklistItemView.as_view(),
+    ),
+    path(
         "buildings/<str:building_id>/floors/<str:floor_id>/workspace-context",
         WorkspaceContextAliasView.as_view(),
     ),
@@ -87,18 +119,36 @@ urlpatterns = [
     path("employees/<str:employee_id>/profile", EmployeeProfileGlobalAliasView.as_view()),
     path("workspace", EmployeeWorkspaceCabinetView.as_view()),
     path("workspace/tasks", WorkspaceTasksAliasView.as_view()),
+    path("workspace/tasks/<str:task_id>/audit", WorkspaceTaskAuditView.as_view()),
+    path("workspace/tasks/<str:task_id>/comments", WorkspaceTaskCommentsView.as_view()),
+    path("workspace/tasks/<str:task_id>/checklist", WorkspaceTaskChecklistView.as_view()),
+    path("workspace/tasks/<str:task_id>/checklist/<str:item_id>", WorkspaceTaskChecklistItemView.as_view()),
     path("workspace/tasks/<str:task_id>", WorkspaceTaskAliasDetailView.as_view()),
     path("employees/me", EmployeeMeProfileView.as_view()),
     path("employees/<str:employee_id>", EmployeeProfileByIdView.as_view()),
     path("workspace/quick-tasks", WorkspaceQuickTasksView.as_view()),
+    path("projects/resource-requests", ProjectResourceRequestCompanyListView.as_view()),
+    path(
+        "projects/resource-requests/<int:request_id>/resolve",
+        ProjectResourceRequestResolveView.as_view(),
+    ),
     path("projects", ProjectListView.as_view()),
     path("projects/<int:pk>", ProjectDetailView.as_view()),
     path("projects/<int:pk>/archive", ProjectArchiveView.as_view()),
     path("projects/<int:pk>/restore", ProjectRestoreView.as_view()),
     path("projects/<int:pk>/members", ProjectMembersView.as_view()),
     path("projects/<int:pk>/members/<int:member_id>", ProjectMemberDetailView.as_view()),
+    path("projects/<int:pk>/resource-requests", ProjectResourceRequestCreateView.as_view()),
     path("company/admin/overview", CompanyAdminOverviewView.as_view()),
     path("company/admin/departments", CompanyAdminDepartmentsView.as_view()),
+    path(
+        "company/admin/departments/<int:department_id>",
+        CompanyAdminDepartmentDetailView.as_view(),
+    ),
+    path(
+        "company/admin/departments/<int:department_id>/lead",
+        CompanyAdminDepartmentLeadView.as_view(),
+    ),
     path("company/admin/users", CompanyAdminUsersView.as_view()),
     path("company/admin/invites", CompanyAdminInvitesView.as_view()),
     path("company/admin/users/<int:user_id>/role", CompanyAdminUserRoleUpdateView.as_view()),

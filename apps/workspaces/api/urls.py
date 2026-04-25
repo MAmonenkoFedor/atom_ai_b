@@ -12,10 +12,20 @@ from .views import (
     EmployeeWorkspaceContextView,
     FloorWorkspaceView,
     WorkspaceTaskAliasDetailView,
+    WorkspaceTaskAuditView,
+    WorkspaceTaskChecklistItemView,
+    WorkspaceTaskChecklistView,
+    WorkspaceTaskCommentsView,
     WorkspaceTasksAliasView,
     WorkspaceContextAliasView,
     WorkspaceContextGlobalAliasView,
+    WorkspaceDocumentLinkView,
+    WorkspaceDocumentUploadView,
     WorkspaceQuickTasksView,
+    WorkspaceTaskBuildingAuditView,
+    WorkspaceTaskBuildingChecklistItemView,
+    WorkspaceTaskBuildingChecklistView,
+    WorkspaceTaskBuildingCommentsView,
 )
 
 urlpatterns = [
@@ -42,6 +52,26 @@ urlpatterns = [
         name="employee-profile",
     ),
     path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/audit",
+        WorkspaceTaskBuildingAuditView.as_view(),
+        name="workspace-task-building-audit",
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/comments",
+        WorkspaceTaskBuildingCommentsView.as_view(),
+        name="workspace-task-building-comments",
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist",
+        WorkspaceTaskBuildingChecklistView.as_view(),
+        name="workspace-task-building-checklist",
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist/<str:item_id>",
+        WorkspaceTaskBuildingChecklistItemView.as_view(),
+        name="workspace-task-building-checklist-item",
+    ),
+    path(
         "buildings/<str:building_id>/floors/<str:floor_id>/workspace-context",
         WorkspaceContextAliasView.as_view(),
         name="workspace-context-alias",
@@ -57,7 +87,29 @@ urlpatterns = [
         name="employee-profile-global-alias",
     ),
     path("workspace", EmployeeWorkspaceCabinetView.as_view(), name="workspace"),
+    path("workspace/documents/upload", WorkspaceDocumentUploadView.as_view(), name="workspace-documents-upload"),
+    path("workspace/documents/link", WorkspaceDocumentLinkView.as_view(), name="workspace-documents-link"),
     path("workspace/tasks", WorkspaceTasksAliasView.as_view(), name="workspace-tasks-alias"),
+    path(
+        "workspace/tasks/<str:task_id>/audit",
+        WorkspaceTaskAuditView.as_view(),
+        name="workspace-task-audit-alias",
+    ),
+    path(
+        "workspace/tasks/<str:task_id>/comments",
+        WorkspaceTaskCommentsView.as_view(),
+        name="workspace-task-comments-alias",
+    ),
+    path(
+        "workspace/tasks/<str:task_id>/checklist",
+        WorkspaceTaskChecklistView.as_view(),
+        name="workspace-task-checklist-alias",
+    ),
+    path(
+        "workspace/tasks/<str:task_id>/checklist/<str:item_id>",
+        WorkspaceTaskChecklistItemView.as_view(),
+        name="workspace-task-checklist-item-alias",
+    ),
     path(
         "workspace/tasks/<str:task_id>",
         WorkspaceTaskAliasDetailView.as_view(),

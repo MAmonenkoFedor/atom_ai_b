@@ -28,10 +28,10 @@ VITE_API_MOCK_LATENCY_MS=120
 
 ## 3) Тестовые креды
 
-- `employee_test / Pass12345!`
-- `manager_test / Pass12345!`
-- `company_admin_test / Pass12345!`
-- `super_admin_test / Pass12345!`
+- `employee_test / AtomTest123!`
+- `manager_test / AtomTest123!`
+- `company_admin_test / AtomTest123!`
+- `super_admin_test / AtomTest123!`
 
 ## 4) Employee vertical endpoints
 

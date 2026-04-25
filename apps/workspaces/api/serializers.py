@@ -7,6 +7,12 @@ class TaskSerializer(serializers.Serializer):
     column = serializers.CharField()
     priority = serializers.CharField()
     due = serializers.CharField()
+    employee_id = serializers.CharField(required=False, allow_blank=True)
+    employee_name = serializers.CharField(required=False, allow_blank=True)
+    employee_role = serializers.CharField(required=False, allow_blank=True)
+    group = serializers.CharField(required=False, allow_blank=True)
+    project_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    updated_at = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         ref_name = "WorkspaceTask"
@@ -86,6 +92,9 @@ class DocumentSerializer(serializers.Serializer):
     type = serializers.CharField()
     updated_at = serializers.CharField()
     owner = serializers.CharField()
+    href = serializers.CharField(required=False, allow_blank=True)
+    project_id = serializers.CharField(required=False, allow_blank=True)
+    project_name = serializers.CharField(required=False, allow_blank=True)
 
 
 class ActivitySerializer(serializers.Serializer):
@@ -149,7 +158,9 @@ class EmployeeHeaderSerializer(serializers.Serializer):
     title = serializers.CharField()
     avatar = serializers.CharField()
     department = serializers.CharField()
-    status = serializers.CharField()
+    status = serializers.CharField(required=False, allow_blank=True)
+    presence_status = serializers.CharField(required=False, allow_blank=True)
+    work_status = serializers.CharField(required=False, allow_blank=True)
     role_source_of_truth = serializers.CharField(required=False)
 
 
@@ -180,12 +191,19 @@ class WorkspaceEmployeeCabinetSerializer(serializers.Serializer):
     quick_actions = serializers.JSONField()
     stats = serializers.JSONField()
     tasks_grouped = serializers.JSONField()
+    documents = DocumentSerializer(many=True)
     project_context = serializers.JSONField()
     activity_feed = serializers.JSONField()
     ai_context = serializers.JSONField()
     role_extras = serializers.JSONField(required=False)
     viewer_role = serializers.CharField()
     contract_meta = ContractMetaSerializer(required=False)
+    storage_hints = serializers.JSONField(required=False)
+
+
+class WorkspaceDocumentLinkCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=500)
+    url = serializers.URLField()
 
 
 class EmployeeOwnerProfileSerializer(serializers.Serializer):
@@ -219,6 +237,14 @@ class UpdateMyEmployeeProfileSerializer(serializers.Serializer):
     working_hours = serializers.CharField(required=False)
     timezone = serializers.CharField(required=False)
     preferences = serializers.DictField(required=False)
+    presence_status = serializers.ChoiceField(
+        choices=["online", "idle", "offline", "in_call", "vacation", "sick"],
+        required=False,
+    )
+    work_status = serializers.ChoiceField(
+        choices=["on_track", "at_risk", "overloaded", "blocked", "high_performer"],
+        required=False,
+    )
 
 
 class QuickTaskCreateSerializer(serializers.Serializer):
@@ -249,3 +275,17 @@ class WorkspaceTaskAliasPatchSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["todo", "in_progress", "done"], required=False)
     priority = serializers.ChoiceField(choices=["high", "medium", "low"], required=False)
     due = serializers.CharField(required=False, allow_null=True)
+
+
+class WorkspaceTaskCommentCreateSerializer(serializers.Serializer):
+    message = serializers.CharField()
+
+
+class WorkspaceTaskChecklistCreateSerializer(serializers.Serializer):
+    title = serializers.CharField()
+
+
+class WorkspaceTaskChecklistPatchSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, allow_blank=True)
+    done = serializers.BooleanField(required=False)
+    position = serializers.IntegerField(required=False, min_value=1)

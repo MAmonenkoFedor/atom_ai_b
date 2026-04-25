@@ -5,6 +5,8 @@ from rest_framework.views import exception_handler
 DRF_DETAIL_PATH_PREFIXES = (
     "/api/auth/",
     "/api/v1/auth/",
+    "/api/super-admin/",
+    "/api/v1/super-admin/",
     "/api/projects",
     "/api/v1/projects",
     "/api/company/admin/",
@@ -21,6 +23,8 @@ DRF_DETAIL_PATH_PREFIXES = (
     "/api/v1/admin/action-center/",
     "/api/tasks",
     "/api/v1/tasks",
+    "/api/ai/",
+    "/api/v1/ai/",
     "/api/buildings",
     "/api/v1/buildings",
     "/api/workspace/",
@@ -37,7 +41,10 @@ def _extract_message(detail):
         if detail:
             first_value = next(iter(detail.values()))
             if isinstance(first_value, list) and first_value:
-                return str(first_value[0])
+                first_item = first_value[0]
+                if hasattr(first_item, "string") and first_item.string:
+                    return str(first_item.string)
+                return str(first_item)
             return str(first_value)
         return "Request failed"
     if isinstance(detail, list):
@@ -49,6 +56,14 @@ def _is_drf_detail_contract_path(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in DRF_DETAIL_PATH_PREFIXES)
 
 
+def _extract_top_level_code(detail) -> str | None:
+    if isinstance(detail, dict):
+        raw = detail.get("code")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
 def unified_exception_handler(exc, context):
     response = exception_handler(exc, context)
 
@@ -58,7 +73,11 @@ def unified_exception_handler(exc, context):
     request = context.get("request")
     request_path = request.path if request else ""
     if _is_drf_detail_contract_path(request_path):
-        response.data = {"detail": _extract_message(response.data)}
+        payload = {"detail": _extract_message(response.data)}
+        api_code = _extract_top_level_code(response.data)
+        if api_code:
+            payload["code"] = api_code
+        response.data = payload
         return response
 
     error_type = "validation_error" if response.status_code == 400 else "api_error"

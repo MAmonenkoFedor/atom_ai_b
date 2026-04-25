@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from apps.identity.models import Role, UserRole
+from apps.organizations.models import Organization, OrganizationMember
+from apps.orgstructure.models import OrgUnit, OrgUnitMember
+from apps.projects.models import Project, ProjectMember
 
 
 class Command(BaseCommand):
@@ -10,8 +13,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--password",
-            default="Pass12345!",
-            help="Password for both test users.",
+            default="AtomTest123!",
+            help="Password for all seeded test users (override for your env).",
         )
 
     def handle(self, *args, **options):
@@ -33,6 +36,14 @@ class Command(BaseCommand):
         role_manager, _ = Role.objects.get_or_create(
             code="manager",
             defaults={"name": "Manager"},
+        )
+        role_executive, _ = Role.objects.get_or_create(
+            code="executive",
+            defaults={"name": "CEO / Executive"},
+        )
+        role_ceo, _ = Role.objects.get_or_create(
+            code="ceo",
+            defaults={"name": "CEO"},
         )
 
         employee_user, _ = user_model.objects.get_or_create(
@@ -99,14 +110,112 @@ class Command(BaseCommand):
             update_fields=["email", "is_active", "password", "first_name", "last_name"]
         )
 
+        executive_user, _ = user_model.objects.get_or_create(
+            username="executive_test",
+            defaults={
+                "email": "executive_test@atom.local",
+                "first_name": "CEO",
+                "last_name": "Test",
+                "is_active": True,
+            },
+        )
+        executive_user.email = "executive_test@atom.local"
+        executive_user.is_active = True
+        executive_user.set_password(password)
+        executive_user.save(
+            update_fields=["email", "is_active", "password", "first_name", "last_name"]
+        )
+
+        ceo_user, _ = user_model.objects.get_or_create(
+            username="ceo_test",
+            defaults={
+                "email": "ceo_test@atom.local",
+                "first_name": "CEO",
+                "last_name": "Alias",
+                "is_active": True,
+            },
+        )
+        ceo_user.email = "ceo_test@atom.local"
+        ceo_user.is_active = True
+        ceo_user.set_password(password)
+        ceo_user.save(
+            update_fields=["email", "is_active", "password", "first_name", "last_name"]
+        )
+
         UserRole.objects.get_or_create(user=company_admin, role=role_company_admin, organization=None)
         UserRole.objects.get_or_create(user=super_admin, role=role_super_admin, organization=None)
         UserRole.objects.get_or_create(user=employee_user, role=role_employee, organization=None)
         UserRole.objects.get_or_create(user=manager_user, role=role_manager, organization=None)
+        UserRole.objects.get_or_create(user=executive_user, role=role_executive, organization=None)
+        UserRole.objects.get_or_create(user=ceo_user, role=role_ceo, organization=None)
+
+        # ProjectCreateSerializer defaults `organization` from OrganizationMember. Without this,
+        # POST /api/projects returns 400 for users that only have UserRole rows.
+        organization, _ = Organization.objects.get_or_create(
+            slug="atom-demo",
+            defaults={"name": "ATOM Demo Company", "is_active": True},
+        )
+        organization.name = "ATOM Demo Company"
+        organization.is_active = True
+        organization.save(update_fields=["name", "is_active"])
+
+        for user, title in (
+            (employee_user, "Test Employee"),
+            (manager_user, "Test Manager"),
+            (company_admin, "Company Admin"),
+            (super_admin, "Super Admin"),
+            (executive_user, "Executive"),
+            (ceo_user, "CEO"),
+        ):
+            OrganizationMember.objects.get_or_create(
+                organization=organization,
+                user=user,
+                defaults={"job_title": title, "is_active": True},
+            )
+
+        marketing_unit, _ = OrgUnit.objects.get_or_create(
+            organization=organization,
+            name="Marketing",
+            defaults={"code": "MKT", "is_active": True},
+        )
+        OrgUnit.objects.get_or_create(
+            organization=organization,
+            name="Engineering",
+            defaults={"code": "ENG", "is_active": True},
+        )
+        OrgUnitMember.objects.get_or_create(
+            org_unit=marketing_unit,
+            user=manager_user,
+            defaults={"position": "Lead", "is_lead": True},
+        )
+
+        demo_project, _ = Project.objects.get_or_create(
+            organization=organization,
+            name="Демо: команда маркетинга",
+            defaults={
+                "code": "MKT-DEMO",
+                "description": "Демо-проект для проверки ролей, участников и документов.",
+                "status": Project.STATUS_ACTIVE,
+                "created_by": manager_user,
+                "primary_org_unit": marketing_unit,
+            },
+        )
+        ProjectMember.objects.get_or_create(
+            project=demo_project,
+            user=manager_user,
+            defaults={"role": ProjectMember.ROLE_OWNER, "is_active": True},
+        )
+        ProjectMember.objects.get_or_create(
+            project=demo_project,
+            user=employee_user,
+            defaults={"role": ProjectMember.ROLE_VIEWER, "is_active": True},
+        )
 
         self.stdout.write(self.style.SUCCESS("Test credentials are ready:"))
         self.stdout.write(f"  employee      -> username: {employee_user.username}")
         self.stdout.write(f"  manager       -> username: {manager_user.username}")
         self.stdout.write(f"  company_admin -> username: {company_admin.username}")
         self.stdout.write(f"  super_admin   -> username: {super_admin.username}")
+        self.stdout.write(f"  executive     -> username: {executive_user.username}")
+        self.stdout.write(f"  ceo (alias)   -> username: {ceo_user.username}")
         self.stdout.write(f"  password      -> {password}")

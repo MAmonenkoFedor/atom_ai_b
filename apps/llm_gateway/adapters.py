@@ -21,16 +21,21 @@ class AdapterResult:
 class BaseAdapter:
     provider_code = "base"
 
-    def generate(self, prompt: str, model_code: str) -> AdapterResult:
+    def generate(self, prompt: str, model_code: str, provider=None) -> AdapterResult:
         # Deterministic switch to test fallback/retry flow without external APIs.
         if f"force_fail:{self.provider_code}" in prompt:
             raise RuntimeError(f"Forced failure for provider {self.provider_code}")
 
+        if provider is not None and provider.mock_override is not None:
+            if provider.mock_override:
+                return self._mock_response(prompt=prompt, model_code=model_code)
+            return self._real_generate(prompt=prompt, model_code=model_code, provider=provider)
+
         if settings.LLM_GATEWAY_MOCK_MODE:
             return self._mock_response(prompt=prompt, model_code=model_code)
-        return self._real_generate(prompt=prompt, model_code=model_code)
+        return self._real_generate(prompt=prompt, model_code=model_code, provider=provider)
 
-    def _real_generate(self, prompt: str, model_code: str) -> AdapterResult:
+    def _real_generate(self, prompt: str, model_code: str, provider=None) -> AdapterResult:
         raise NotImplementedError
 
     @staticmethod
@@ -62,17 +67,20 @@ class BaseAdapter:
 class OpenAIAdapter(BaseAdapter):
     provider_code = "openai"
 
-    def _real_generate(self, prompt: str, model_code: str) -> AdapterResult:
-        if not settings.OPENAI_API_KEY:
+    def _real_generate(self, prompt: str, model_code: str, provider=None) -> AdapterResult:
+        provider_cfg = provider.config if provider and isinstance(provider.config, dict) else {}
+        api_key = (provider_cfg.get("api_key") or "").strip() or settings.OPENAI_API_KEY
+        base_url = (provider_cfg.get("base_url") or "").strip() or settings.OPENAI_BASE_URL
+        if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured")
-        base_url = settings.OPENAI_BASE_URL.rstrip("/")
+        base_url = base_url.rstrip("/")
         url = f"{base_url}/chat/completions"
         payload = {
             "model": model_code,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.2,
         }
-        headers = {"Authorization": f"Bearer {settings.OPENAI_API_KEY}"}
+        headers = {"Authorization": f"Bearer {api_key}"}
         data = self._request_json(url=url, payload=payload, headers=headers)
         text = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {})
@@ -86,10 +94,13 @@ class OpenAIAdapter(BaseAdapter):
 class ClaudeAdapter(BaseAdapter):
     provider_code = "claude"
 
-    def _real_generate(self, prompt: str, model_code: str) -> AdapterResult:
-        if not settings.ANTHROPIC_API_KEY:
+    def _real_generate(self, prompt: str, model_code: str, provider=None) -> AdapterResult:
+        provider_cfg = provider.config if provider and isinstance(provider.config, dict) else {}
+        api_key = (provider_cfg.get("api_key") or "").strip() or settings.ANTHROPIC_API_KEY
+        base_url = (provider_cfg.get("base_url") or "").strip() or settings.ANTHROPIC_BASE_URL
+        if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not configured")
-        base_url = settings.ANTHROPIC_BASE_URL.rstrip("/")
+        base_url = base_url.rstrip("/")
         url = f"{base_url}/messages"
         payload = {
             "model": model_code,
@@ -97,7 +108,7 @@ class ClaudeAdapter(BaseAdapter):
             "messages": [{"role": "user", "content": prompt}],
         }
         headers = {
-            "x-api-key": settings.ANTHROPIC_API_KEY,
+            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
         }
         data = self._request_json(url=url, payload=payload, headers=headers)
@@ -115,11 +126,14 @@ class ClaudeAdapter(BaseAdapter):
 class GeminiAdapter(BaseAdapter):
     provider_code = "gemini"
 
-    def _real_generate(self, prompt: str, model_code: str) -> AdapterResult:
-        if not settings.GEMINI_API_KEY:
+    def _real_generate(self, prompt: str, model_code: str, provider=None) -> AdapterResult:
+        provider_cfg = provider.config if provider and isinstance(provider.config, dict) else {}
+        api_key = (provider_cfg.get("api_key") or "").strip() or settings.GEMINI_API_KEY
+        base_url = (provider_cfg.get("base_url") or "").strip() or settings.GEMINI_BASE_URL
+        if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
-        base_url = settings.GEMINI_BASE_URL.rstrip("/")
-        query = urllib.parse.urlencode({"key": settings.GEMINI_API_KEY})
+        base_url = base_url.rstrip("/")
+        query = urllib.parse.urlencode({"key": api_key})
         url = f"{base_url}/models/{model_code}:generateContent?{query}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         data = self._request_json(url=url, payload=payload, headers={})

@@ -11,12 +11,18 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import serializers, status
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .permissions import IsCompanyAdminOrSuperAdmin, IsSuperAdmin
+from apps.projects.models import Project
+from apps.projects.project_permissions import (
+    ProjectAccessContext,
+    can_project_task_action,
+    can_view_project_tasks,
+)
 
 CURSOR_PARAM_DESCRIPTION = (
     "Cursor-based pagination token. "
@@ -950,17 +956,6 @@ class CompanyAdminOverviewView(APIView):
         )
 
 
-class CompanyAdminDepartmentsView(APIView):
-    permission_classes = [IsCompanyAdminOrSuperAdmin]
-
-    @extend_schema(
-        operation_id="companyAdminDepartmentsList",
-        responses=CompanyDepartmentSummarySerializer(many=True),
-    )
-    def get(self, request):
-        return Response(COMPANY_DEPARTMENTS)
-
-
 class CompanyAdminUsersView(APIView):
     permission_classes = [IsCompanyAdminOrSuperAdmin]
 
@@ -1518,6 +1513,124 @@ class AdminActionDetailView(APIView):
         raise NotFound(detail="Action event not found.")
 
 
+def _project_id_from_task(task: dict | None) -> int | None:
+    if not task:
+        return None
+    raw = task.get("project_id")
+    if raw in (None, ""):
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_project(*candidates: dict | None) -> Project | None:
+    """Restore the project for a task by inspecting any payload/snapshot in order."""
+
+    for source in candidates:
+        project_id = _project_id_from_task(source)
+        if project_id is None:
+            continue
+        project = Project.objects.filter(pk=project_id).first()
+        if project is not None:
+            return project
+    return None
+
+
+def _require_project_task_permission(
+    request,
+    task: dict | None,
+    permission_code: str,
+    message: str,
+    *,
+    fallback_task: dict | None = None,
+) -> None:
+    project = _resolve_project(task, fallback_task)
+    if project is None:
+        return
+    if not can_project_task_action(request.user, project, permission_code):
+        raise PermissionDenied(message)
+
+
+def _require_project_task_visibility(
+    request,
+    task: dict | None,
+    *,
+    fallback_task: dict | None = None,
+) -> None:
+    """Hide project task detail when user cannot view project tasks.
+
+    We intentionally raise 404 (not 403) to keep detail endpoints aligned
+    with list filtering semantics and avoid task-id enumeration.
+    """
+
+    project = _resolve_project(task, fallback_task)
+    if project is None:
+        return
+    if not can_view_project_tasks(request.user, project):
+        raise NotFound(detail="Task not found.")
+
+
+def _has_project_task_visibility(user, task: dict | None, *, fallback_task: dict | None = None) -> bool:
+    """Boolean counterpart for bulk/list flows (no exceptions)."""
+
+    project = _resolve_project(task, fallback_task)
+    if project is None:
+        return True
+    return can_view_project_tasks(user, project)
+
+
+def _filter_tasks_by_project_visibility(user, tasks: list[dict]) -> list[dict]:
+    """Drop tasks that belong to projects the user can't see.
+
+    Tasks without ``project_id`` stay visible — they aren't gated by any
+    project policy. For tasks with a project we resolve
+    :func:`can_view_project_tasks` (``tasks.view`` / ``project.tasks.*`` and membership).
+    """
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return []
+    project_ids: set[int] = set()
+    for task in tasks:
+        pid = _project_id_from_task(task)
+        if pid is not None:
+            project_ids.add(pid)
+    if not project_ids:
+        return tasks
+    projects = list(Project.objects.filter(pk__in=project_ids))
+    by_id = {p.pk: p for p in projects}
+    ctx = ProjectAccessContext(user, projects)
+    if not ctx._is_privileged and not by_id:  # noqa: SLF001 — internal flag
+        return [t for t in tasks if _project_id_from_task(t) is None]
+    if ctx._is_privileged:  # noqa: SLF001
+        return tasks
+    visible: list[dict] = []
+    for task in tasks:
+        pid = _project_id_from_task(task)
+        if pid is None:
+            visible.append(task)
+            continue
+        project = by_id.get(pid)
+        if project is None:
+            continue
+        if can_view_project_tasks(user, project):
+            visible.append(task)
+    return visible
+
+
+def _required_task_patch_permissions(previous: dict, payload: dict) -> list[str]:
+    required: list[str] = []
+    if "assignee_id" in payload and payload.get("assignee_id") != previous.get("assignee_id"):
+        required.append("tasks.assign")
+    if "due_date" in payload:
+        required.append("tasks.change_deadline")
+    editable_fields = {"title", "description", "status", "priority", "project_id", "department_id"}
+    if editable_fields.intersection(payload.keys()):
+        required.append("tasks.edit")
+    return list(dict.fromkeys(required or ["tasks.edit"]))
+
+
 class TasksView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1611,6 +1724,7 @@ class TasksView(APIView):
     )
     def get(self, request):
         tasks = _apply_task_filters(request.query_params, TASK_ITEMS)
+        tasks = _filter_tasks_by_project_visibility(request.user, tasks)
         cursor = request.query_params.get("cursor")
         if cursor is not None:
             results, page_size, next_cursor = _cursor_paginate_tasks(tasks, request.query_params)
@@ -1664,6 +1778,19 @@ class TasksView(APIView):
             "updated_at": now,
         }
         _validate_task_relations(task)
+        _require_project_task_permission(
+            request,
+            task,
+            "tasks.create",
+            "You do not have permission to create tasks in this project.",
+        )
+        if task.get("assignee_id") != getattr(request.user, "id", None):
+            _require_project_task_permission(
+                request,
+                task,
+                "tasks.assign",
+                "You do not have permission to assign tasks in this project.",
+            )
         TASK_ITEMS.insert(0, task)
         _add_task_activity(
             task_id=task["id"],
@@ -1689,6 +1816,7 @@ class TaskDetailView(APIView):
         task = _find_task(task_id)
         if not task:
             raise NotFound(detail="Task not found.")
+        _require_project_task_visibility(request, task)
         return Response(task)
 
     @extend_schema(
@@ -1700,6 +1828,7 @@ class TaskDetailView(APIView):
         task = _find_task(task_id)
         if not task:
             raise NotFound(detail="Task not found.")
+        _require_project_task_visibility(request, task)
 
         serializer = UpdateTaskRequestSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -1723,6 +1852,21 @@ class TaskDetailView(APIView):
             task["due_date"] = due_date.isoformat().replace("+00:00", "Z") if due_date else None
 
         _validate_task_relations(task)
+        for permission_code in _required_task_patch_permissions(previous, payload):
+            _require_project_task_permission(
+                request,
+                task,
+                permission_code,
+                "You do not have permission to update this task in its project.",
+                fallback_task=previous,
+            )
+        if "project_id" in payload and previous.get("project_id") not in (None, ""):
+            _require_project_task_permission(
+                request,
+                previous,
+                "tasks.edit",
+                "You do not have permission to detach this task from its project.",
+            )
         task["updated_at"] = timezone.now().isoformat().replace("+00:00", "Z")
         changed_fields = {}
         for field in [
@@ -1753,6 +1897,13 @@ class TaskDetailView(APIView):
         task = _find_task(task_id)
         if not task:
             raise NotFound(detail="Task not found.")
+        _require_project_task_visibility(request, task)
+        _require_project_task_permission(
+            request,
+            task,
+            "tasks.edit",
+            "You do not have permission to delete tasks in this project.",
+        )
         _add_task_activity(
             task_id=task["id"],
             event_type="deleted",
@@ -1771,13 +1922,14 @@ class TasksStatsView(APIView):
         responses=TaskStatsSerializer,
     )
     def get(self, request):
-        total = len(TASK_ITEMS)
-        todo = len([t for t in TASK_ITEMS if t["status"] == "todo"])
-        in_progress = len([t for t in TASK_ITEMS if t["status"] == "in_progress"])
-        done = len([t for t in TASK_ITEMS if t["status"] == "done"])
-        high_priority = len([t for t in TASK_ITEMS if t["priority"] == "high"])
-        medium_priority = len([t for t in TASK_ITEMS if t["priority"] == "medium"])
-        low_priority = len([t for t in TASK_ITEMS if t["priority"] == "low"])
+        visible = _filter_tasks_by_project_visibility(request.user, TASK_ITEMS)
+        total = len(visible)
+        todo = len([t for t in visible if t["status"] == "todo"])
+        in_progress = len([t for t in visible if t["status"] == "in_progress"])
+        done = len([t for t in visible if t["status"] == "done"])
+        high_priority = len([t for t in visible if t["priority"] == "high"])
+        medium_priority = len([t for t in visible if t["priority"] == "medium"])
+        low_priority = len([t for t in visible if t["priority"] == "low"])
         return Response(
             {
                 "total": total,
@@ -1809,6 +1961,7 @@ class TasksBoardView(APIView):
     )
     def get(self, request):
         tasks = _apply_task_filters(request.query_params, TASK_ITEMS)
+        tasks = _filter_tasks_by_project_visibility(request.user, tasks)
         return Response(
             {
                 "todo": [t for t in tasks if t["status"] == "todo"],
@@ -1841,6 +1994,15 @@ class TasksBulkStatusView(APIView):
             if not task:
                 not_found_ids.append(task_id)
                 continue
+            if not _has_project_task_visibility(request.user, task):
+                not_found_ids.append(task_id)
+                continue
+            _require_project_task_permission(
+                request,
+                task,
+                "tasks.edit",
+                "You do not have permission to update task status in this project.",
+            )
             prev_status = task["status"]
             task["status"] = target_status
             task["updated_at"] = now
@@ -1886,6 +2048,15 @@ class TasksBulkAssignView(APIView):
             if not task:
                 not_found_ids.append(task_id)
                 continue
+            if not _has_project_task_visibility(request.user, task):
+                not_found_ids.append(task_id)
+                continue
+            _require_project_task_permission(
+                request,
+                task,
+                "tasks.assign",
+                "You do not have permission to assign tasks in this project.",
+            )
             prev_assignee = task["assignee_id"]
             task["assignee_id"] = assignee_id
             task["updated_at"] = now
@@ -1985,6 +2156,7 @@ class TaskActivityView(APIView):
         task = _find_task(task_id)
         if not task:
             raise NotFound(detail="Task not found.")
+        _require_project_task_visibility(request, task)
         events = _task_activity_for(task_id)
         cursor = request.query_params.get("cursor")
         if cursor is not None:
