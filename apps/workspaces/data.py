@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from itertools import count
+import re
 from rest_framework.exceptions import NotFound, ValidationError
 
 # Same-origin paths: served by Vite `public/` (SPA host), avoids dead `cdn.atom.ai` in local dev.
@@ -348,6 +349,56 @@ EMPLOYEE_VERTICAL_TASKS = {
 }
 
 
+def _slug_username(username: str) -> str:
+    raw = (username or "").strip().lower()
+    if not raw:
+        return "user"
+    slug = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")
+    return slug or "user"
+
+
+def _ensure_dynamic_employee_profile(username: str) -> str:
+    mapped = USERNAME_TO_EMPLOYEE.get(username)
+    if mapped and mapped in EMPLOYEE_VERTICAL_DIRECTORY:
+        return mapped
+
+    slug = _slug_username(username)
+    candidate = f"emp-dyn-{slug}"
+    employee_id = candidate
+    seq = 2
+    while employee_id in EMPLOYEE_VERTICAL_DIRECTORY:
+        employee_id = f"{candidate}-{seq}"
+        seq += 1
+
+    template = deepcopy(EMPLOYEE_VERTICAL_DIRECTORY["emp-1"])
+    display_name = (username or "").strip() or "Employee"
+    template["header"]["id"] = employee_id
+    template["header"]["full_name"] = display_name
+    template["header"]["first_name"] = display_name
+    template["header"]["last_name"] = ""
+    template["header"]["role"] = "employee"
+    template["header"]["title"] = "Employee"
+    template["header"]["department"] = "Unassigned"
+
+    template["contacts"]["work_email"] = ""
+    template["contacts"]["personal_email"] = ""
+    template["contacts"]["telegram"] = ""
+    template["contacts"]["phone"] = ""
+    template["contacts"]["city"] = ""
+    template["contacts"]["is_work_email_public"] = False
+
+    EMPLOYEE_VERTICAL_DIRECTORY[employee_id] = template
+    EMPLOYEE_VERTICAL_TASKS[employee_id] = {
+        "overdue": [],
+        "today": [],
+        "this_week": [],
+        "later": [],
+        "done": [],
+    }
+    USERNAME_TO_EMPLOYEE[username] = employee_id
+    return employee_id
+
+
 def _assignee_fields(employee_id: str) -> dict[str, str]:
     profile = EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id)
     if not profile:
@@ -569,7 +620,7 @@ def get_employee_profile(building_id: str, floor_id: str, employee_id: str) -> d
 
 
 def resolve_employee_id_for_username(username: str) -> str:
-    return USERNAME_TO_EMPLOYEE.get(username, "emp-1")
+    return _ensure_dynamic_employee_profile(username)
 
 
 def _role_extras(role_code: str) -> dict | None:
@@ -767,6 +818,27 @@ def patch_employee_owner_profile(employee_id: str, patch: dict) -> dict:
     profile = EMPLOYEE_VERTICAL_DIRECTORY.get(employee_id)
     if not profile:
         raise NotFound(detail=f"Employee '{employee_id}' not found.")
+
+    if "first_name" in patch or "last_name" in patch:
+        first_name_raw = patch.get("first_name")
+        last_name_raw = patch.get("last_name")
+        current_full_name = str(profile["header"].get("full_name") or "").strip()
+        current_parts = [p for p in current_full_name.split(" ") if p]
+        current_first = current_parts[0] if current_parts else ""
+        current_last = " ".join(current_parts[1:]) if len(current_parts) > 1 else ""
+        first_name = (
+            str(first_name_raw).strip()
+            if first_name_raw is not None
+            else current_first
+        )
+        last_name = (
+            str(last_name_raw).strip()
+            if last_name_raw is not None
+            else current_last
+        )
+        profile["header"]["first_name"] = first_name
+        profile["header"]["last_name"] = last_name
+        profile["header"]["full_name"] = f"{first_name} {last_name}".strip() or current_full_name
 
     for key in ["personal_email", "phone", "telegram", "city", "working_hours", "timezone"]:
         if key in patch:

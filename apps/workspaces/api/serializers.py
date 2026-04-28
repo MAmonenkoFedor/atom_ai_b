@@ -1,4 +1,9 @@
+import re
+
 from rest_framework import serializers
+
+
+TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
 
 
 class TaskSerializer(serializers.Serializer):
@@ -154,6 +159,8 @@ class FlexibleObjectSerializer(serializers.Serializer):
 class EmployeeHeaderSerializer(serializers.Serializer):
     id = serializers.CharField()
     full_name = serializers.CharField()
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     role = serializers.CharField()
     title = serializers.CharField()
     avatar = serializers.CharField()
@@ -229,7 +236,23 @@ class EmployeePublicProfileSerializer(serializers.Serializer):
     public_stats = serializers.JSONField()
 
 
+class EmployeeNotificationSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    event_type = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    created_at = serializers.CharField()
+    href = serializers.CharField(required=False, allow_blank=True)
+
+
+class EmployeeNotificationListSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    results = EmployeeNotificationSerializer(many=True)
+
+
 class UpdateMyEmployeeProfileSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=False, allow_blank=False, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=False, max_length=150)
     personal_email = serializers.EmailField(required=False)
     phone = serializers.CharField(required=False)
     telegram = serializers.CharField(required=False)
@@ -245,6 +268,17 @@ class UpdateMyEmployeeProfileSerializer(serializers.Serializer):
         choices=["on_track", "at_risk", "overloaded", "blocked", "high_performer"],
         required=False,
     )
+
+    def validate_telegram(self, value: str) -> str:
+        raw = (value or "").strip()
+        if not raw:
+            return raw
+        username = raw[1:] if raw.startswith("@") else raw
+        if not TELEGRAM_USERNAME_RE.match(username):
+            raise serializers.ValidationError(
+                "Telegram должен быть в формате @username (5-32 символа: буквы, цифры, _)."
+            )
+        return f"@{username}"
 
 
 class QuickTaskCreateSerializer(serializers.Serializer):

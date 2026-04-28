@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, PolymorphicProxySerializer, extend_schema
@@ -8,6 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.service import emit_audit_event
+from apps.audit.models import AuditEvent
+from apps.identity.api.serializers import SessionUserSerializer
+from apps.orgstructure.models import OrgUnit
+from apps.projects.models import Project
 from apps.workspaces import data, documents_service
 
 from .serializers import (
@@ -17,6 +22,7 @@ from .serializers import (
     DocumentSerializer,
     EmployeeProfileSerializer,
     EmployeeOwnerProfileSerializer,
+    EmployeeNotificationListSerializer,
     EmployeePublicProfileSerializer,
     EmployeeWorkspaceContextSerializer,
     TaskSerializer,
@@ -187,6 +193,198 @@ def _resolve_viewer_role(user) -> str:
     return "employee"
 
 
+_CAREER_EVENT_TITLE_MAP = {
+    "joined_department": "Вас добавили в отдел",
+    "left_department": "Вас убрали из отдела",
+    "transferred_department": "Вас перевели в другой отдел",
+    "became_department_lead": "Вас назначили главой отдела",
+    "removed_as_department_lead": "С вас сняли роль главы отдела",
+    "assigned_to_project": "Вас добавили в проект",
+    "removed_from_project": "Вас убрали из проекта",
+    "became_project_lead": "Вас назначили ответственным за проект",
+    "removed_as_project_lead": "С вас сняли роль ответственного за проект",
+    "project_role_changed": "Вам изменили роль в проекте",
+    "manager_changed": "Вам изменили руководителя",
+    "job_title_changed": "Вам изменили должность",
+    "system_role_changed": "Вам изменили системную роль",
+}
+
+
+def _notification_targets_user(event: AuditEvent, user_id: int) -> bool:
+    uid = str(user_id)
+    if event.entity_type == "employee" and str(event.entity_id or "") == uid:
+        return True
+    payload = event.payload or {}
+    if not isinstance(payload, dict):
+        return False
+    for key in ("user_id", "subject_user_id", "employee_id", "member_user_id", "target_user_id"):
+        raw = payload.get(key)
+        if raw is None:
+            continue
+        if str(raw).strip() == uid:
+            return True
+    return False
+
+
+def _notification_title(event: AuditEvent, project_names: dict[str, str], org_unit_names: dict[str, str]) -> str:
+    event_type = event.event_type or ""
+    payload = event.payload or {}
+
+    if event_type.startswith("career."):
+        suffix = event_type.split("career.", 1)[1]
+        base = _CAREER_EVENT_TITLE_MAP.get(suffix, "Обновление в вашей карьере")
+        if suffix in {"joined_department", "transferred_department", "became_department_lead"}:
+            org_unit_id = str(payload.get("org_unit_id") or event.department_id or "").strip()
+            if org_unit_id and org_unit_id in org_unit_names:
+                return f"{base}: {org_unit_names[org_unit_id]}"
+        if suffix in {"assigned_to_project", "became_project_lead", "project_role_changed"}:
+            project_id = str(event.project_id or "").strip()
+            if project_id and project_id in project_names:
+                return f"{base}: {project_names[project_id]}"
+        return base
+
+    if event_type == "project.project_lead_set":
+        project_id = str(event.project_id or "").strip()
+        if project_id and project_id in project_names:
+            return f"Вас назначили ответственным за проект: {project_names[project_id]}"
+        return "Вас назначили ответственным за проект"
+    if event_type == "project.project_lead_cleared":
+        return "С вас сняли ответственность за проект"
+    if event_type == "project.member_upserted":
+        project_id = str(event.project_id or "").strip()
+        if project_id and project_id in project_names:
+            return f"Вас добавили в проект: {project_names[project_id]}"
+        return "Вас добавили в проект"
+    if event_type == "project.member_deleted":
+        return "Вас удалили из проекта"
+    if event_type == "org.department_lead_set":
+        org_unit_id = str(payload.get("org_unit_id") or event.department_id or "").strip()
+        if org_unit_id and org_unit_id in org_unit_names:
+            return f"Вас назначили главой отдела: {org_unit_names[org_unit_id]}"
+        return "Вас назначили главой отдела"
+    if event_type == "org.department_lead_cleared":
+        return "С вас сняли роль главы отдела"
+    if event_type == "org.department_membership_changed":
+        to_dep = str(payload.get("to_department_id") or "").strip()
+        from_dep = str(payload.get("from_department_id") or "").strip()
+        if to_dep and to_dep in org_unit_names:
+            return f"Вас добавили в отдел: {org_unit_names[to_dep]}"
+        if from_dep and from_dep in org_unit_names:
+            return f"Вас убрали из отдела: {org_unit_names[from_dep]}"
+        return "Изменили ваше назначение в отдел"
+
+    return "Изменение доступа или роли"
+
+
+def _notification_description(event: AuditEvent) -> str:
+    actor = event.actor
+    actor_name = "Система"
+    if actor is not None:
+        actor_name = (actor.get_full_name() or actor.username or "").strip() or "Система"
+    return f"Источник: {actor_name}"
+
+
+def _notification_href(event: AuditEvent) -> str:
+    if event.project_id:
+        return f"/app/projects/{event.project_id}"
+    if event.task_id:
+        return f"/app/tasks/{event.task_id}"
+    return "/app/employee/me"
+
+
+def _collect_employee_notifications(user, limit: int = 25) -> list[dict]:
+    candidate_events = list(
+        AuditEvent.objects.select_related("actor")
+        .filter(
+            Q(event_type__startswith="career.")
+            | Q(event_type__in=[
+                "project.project_lead_set",
+                "project.project_lead_cleared",
+                "project.member_upserted",
+                "project.member_deleted",
+                "org.department_lead_set",
+                "org.department_lead_cleared",
+                "org.department_membership_changed",
+            ])
+        )
+        .order_by("-created_at")[:400]
+    )
+    relevant = [event for event in candidate_events if _notification_targets_user(event, user.id)]
+    relevant = relevant[: max(1, min(limit, 100))]
+
+    project_ids = sorted({str(event.project_id).strip() for event in relevant if str(event.project_id or "").strip()})
+    org_unit_ids: set[str] = set()
+    for event in relevant:
+        if str(event.department_id or "").strip():
+            org_unit_ids.add(str(event.department_id).strip())
+        payload = event.payload or {}
+        if isinstance(payload, dict):
+            raw = payload.get("org_unit_id") or payload.get("to_department_id") or payload.get("from_department_id")
+            if raw is not None and str(raw).strip():
+                org_unit_ids.add(str(raw).strip())
+
+    project_names = {
+        str(row["id"]): row["name"]
+        for row in Project.objects.filter(id__in=project_ids).values("id", "name")
+    }
+    org_unit_names = {
+        str(row["id"]): row["name"]
+        for row in OrgUnit.objects.filter(id__in=sorted(org_unit_ids)).values("id", "name")
+    }
+
+    return [
+        {
+            "id": str(event.id),
+            "event_type": event.event_type,
+            "title": _notification_title(event, project_names, org_unit_names),
+            "description": _notification_description(event),
+            "created_at": event.created_at.isoformat() if event.created_at else "",
+            "href": _notification_href(event),
+        }
+        for event in relevant
+    ]
+
+
+def _split_name(full_name: str) -> tuple[str, str]:
+    parts = [p for p in (full_name or "").strip().split(" ") if p]
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def _hydrate_owner_profile_for_user(payload: dict, user) -> dict:
+    header = payload.setdefault("header", {})
+    contacts = payload.setdefault("contacts", {})
+
+    existing_full_name = str(header.get("full_name") or "").strip()
+    first_name = (getattr(user, "first_name", "") or "").strip()
+    last_name = (getattr(user, "last_name", "") or "").strip()
+    if not first_name or not last_name:
+        fallback_first, fallback_last = _split_name(existing_full_name)
+        first_name = first_name or fallback_first
+        last_name = last_name or fallback_last
+
+    full_name = f"{first_name} {last_name}".strip() or existing_full_name or user.username
+    header["first_name"] = first_name
+    header["last_name"] = last_name
+    header["full_name"] = full_name
+
+    work_email = (getattr(user, "email", "") or "").strip()
+    if work_email:
+        contacts["work_email"] = work_email
+
+    session_user = SessionUserSerializer(user).data
+    department = (session_user.get("department") or "").strip()
+    if department:
+        header["department"] = department
+    title = (session_user.get("job_title") or "").strip()
+    if title:
+        header["title"] = title
+    return payload
+
+
 class EmployeeWorkspaceCabinetView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -236,6 +434,7 @@ class EmployeeMeProfileView(APIView):
     def get(self, request):
         employee_id = data.resolve_employee_id_for_username(request.user.username)
         payload = data.get_employee_owner_profile(employee_id)
+        payload = _hydrate_owner_profile_for_user(payload, request.user)
         return Response(EmployeeOwnerProfileSerializer(payload).data)
 
     @extend_schema(
@@ -246,8 +445,22 @@ class EmployeeMeProfileView(APIView):
     def patch(self, request):
         serializer = UpdateMyEmployeeProfileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        validated = dict(serializer.validated_data)
+
+        user = request.user
+        changed_user_fields: list[str] = []
+        if "first_name" in validated:
+            user.first_name = (validated["first_name"] or "").strip()
+            changed_user_fields.append("first_name")
+        if "last_name" in validated:
+            user.last_name = (validated["last_name"] or "").strip()
+            changed_user_fields.append("last_name")
+        if changed_user_fields:
+            user.save(update_fields=changed_user_fields)
+
         employee_id = data.resolve_employee_id_for_username(request.user.username)
-        payload = data.patch_employee_owner_profile(employee_id, serializer.validated_data)
+        payload = data.patch_employee_owner_profile(employee_id, validated)
+        payload = _hydrate_owner_profile_for_user(payload, request.user)
         return Response(EmployeeOwnerProfileSerializer(payload).data)
 
 
@@ -271,6 +484,22 @@ class EmployeeProfileByIdView(APIView):
             return Response(EmployeeOwnerProfileSerializer(payload).data)
         payload = data.get_employee_public_profile(employee_id)
         return Response(EmployeePublicProfileSerializer(payload).data)
+
+
+class EmployeeMeNotificationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="employeeMeNotifications",
+        responses=EmployeeNotificationListSerializer,
+    )
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get("limit") or 25)
+        except (TypeError, ValueError):
+            limit = 25
+        notifications = _collect_employee_notifications(request.user, limit=limit)
+        return Response({"count": len(notifications), "results": notifications})
 
 
 class WorkspaceQuickTasksView(APIView):
