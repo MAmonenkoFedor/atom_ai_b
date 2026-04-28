@@ -1,6 +1,8 @@
 from datetime import datetime
 from itertools import count
 
+from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import (
@@ -16,8 +18,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .permissions import IsCompanyAdminOrSuperAdmin, IsSuperAdmin
-from apps.projects.models import Project
+from apps.audit.service import emit_audit_event
+from .permissions import IsCompanyAdminOrSuperAdmin, IsSuperAdmin, normalized_roles_for_user
+from apps.identity.models import Role, UserRole
+from apps.organizations.models import Organization, OrganizationMember
+from apps.orgstructure.models import OrgUnit, OrgUnitMember
+from apps.projects.models import Project, ProjectMember
 from apps.projects.project_permissions import (
     ProjectAccessContext,
     can_project_task_action,
@@ -36,6 +42,73 @@ CURSOR_MODE_DESCRIPTION = (
     "(`timestamp/created_at` desc, then `id` desc). "
     "When `cursor` is not provided, classic `page/page_size` mode is used."
 )
+
+User = get_user_model()
+
+
+def _company_scope_org_ids(user) -> list[int] | None:
+    roles = normalized_roles_for_user(user)
+    if "super_admin" in roles:
+        return None
+    return list(
+        OrganizationMember.objects.filter(user=user, is_active=True).values_list(
+            "organization_id", flat=True
+        )
+    )
+
+
+def _resolve_company_context_org_id(scope_org_ids: list[int] | None) -> int | None:
+    org_qs = Organization.objects.filter(is_active=True).order_by("id")
+    if scope_org_ids is not None:
+        org_qs = org_qs.filter(id__in=scope_org_ids)
+    org = org_qs.first()
+    return int(org.id) if org else None
+
+
+def _ensure_active_org_memberships(org_id: int, user_ids: set[int]) -> None:
+    if not org_id or not user_ids:
+        return
+    existing_rows = OrganizationMember.objects.filter(
+        organization_id=org_id,
+        user_id__in=user_ids,
+    ).values("user_id", "is_active")
+    existing_user_ids = {int(row["user_id"]) for row in existing_rows}
+    inactive_user_ids = {int(row["user_id"]) for row in existing_rows if not row["is_active"]}
+
+    if inactive_user_ids:
+        OrganizationMember.objects.filter(
+            organization_id=org_id,
+            user_id__in=inactive_user_ids,
+            is_active=False,
+        ).update(is_active=True)
+
+    missing_user_ids = sorted(user_ids - existing_user_ids)
+    if missing_user_ids:
+        OrganizationMember.objects.bulk_create(
+            [
+                OrganizationMember(
+                    organization_id=org_id,
+                    user_id=uid,
+                    is_active=True,
+                    job_title="",
+                )
+                for uid in missing_user_ids
+            ],
+            ignore_conflicts=True,
+        )
+
+
+def _primary_role_for_user(user) -> str:
+    roles = normalized_roles_for_user(user)
+    if "company_admin" in roles:
+        return "company_admin"
+    if "manager" in roles:
+        return "manager"
+    return "employee"
+
+
+def _user_status_for_row(user) -> str:
+    return "active" if getattr(user, "is_active", False) else "blocked"
 
 
 class CompanyAdminOverviewSerializer(serializers.Serializer):
@@ -245,6 +318,34 @@ class TaskActivityListResponseSerializer(serializers.Serializer):
     num_pages = serializers.IntegerField()
     next_cursor = serializers.CharField(allow_null=True)
     results = TaskActivityEventSerializer(many=True)
+
+
+class TaskActivityCreateSerializer(serializers.Serializer):
+    event_type = serializers.ChoiceField(choices=["commented", "attachment_added"])
+    message = serializers.CharField(required=False, allow_blank=False, max_length=4000)
+    document_id = serializers.CharField(required=False, allow_blank=False, max_length=128)
+    document_title = serializers.CharField(required=False, allow_blank=False, max_length=500)
+    document_url = serializers.CharField(required=False, allow_blank=False, max_length=4000)
+
+    def validate(self, attrs):
+        event_type = attrs.get("event_type")
+        if event_type == "commented":
+            message = str(attrs.get("message") or "").strip()
+            if not message:
+                raise serializers.ValidationError({"message": "This field is required for comments."})
+            attrs["message"] = message
+            return attrs
+        if event_type == "attachment_added":
+            title = str(attrs.get("document_title") or "").strip()
+            url = str(attrs.get("document_url") or "").strip()
+            if not title:
+                raise serializers.ValidationError({"document_title": "This field is required for attachments."})
+            if not url:
+                raise serializers.ValidationError({"document_url": "This field is required for attachments."})
+            attrs["document_title"] = title
+            attrs["document_url"] = url
+            return attrs
+        return attrs
 
 
 class TaskStatsSerializer(serializers.Serializer):
@@ -626,7 +727,28 @@ def _find_task(task_id: int):
 
 
 def _company_user_department_map():
-    return {int(user["id"]): user.get("department_id") for user in COMPANY_USERS}
+    """
+    Compatibility map for legacy demo payloads + real DB users.
+
+    `TasksView` still reuses this helper for relation validation, so include
+    all active users from the DB to avoid false "Unknown assignee_id" errors
+    when project members were added through real APIs.
+    """
+
+    mapping = {int(user["id"]): user.get("department_id") for user in COMPANY_USERS}
+
+    for row in User.objects.filter(is_active=True).values("id"):
+        uid = int(row["id"])
+        mapping.setdefault(uid, None)
+
+    for row in OrgUnitMember.objects.filter(
+        org_unit__is_active=True,
+    ).values("user_id", "org_unit_id"):
+        uid = int(row["user_id"])
+        org_unit_id = row.get("org_unit_id")
+        mapping[uid] = int(org_unit_id) if org_unit_id is not None else mapping.get(uid)
+
+    return mapping
 
 
 def _company_department_ids():
@@ -649,6 +771,16 @@ def _validate_task_relations(task):
     project_id = task.get("project_id")
     if project_id is not None and int(project_id) <= 0:
         errors["project_id"] = "project_id must be a positive integer or null."
+
+    if project_id not in (None, "") and assignee_id in user_department:
+        pid = int(project_id)
+        is_active_member = ProjectMember.objects.filter(
+            project_id=pid,
+            user_id=assignee_id,
+            is_active=True,
+        ).exists()
+        if not is_active_member:
+            errors["assignee_id"] = "Assignee must be an active member of the selected project."
 
     if assignee_id in user_department and department_id is not None:
         expected_department = user_department[assignee_id]
@@ -947,11 +1079,40 @@ class CompanyAdminOverviewView(APIView):
         responses=CompanyAdminOverviewSerializer,
     )
     def get(self, request):
+        org_ids = _company_scope_org_ids(request.user)
+        org_qs = Organization.objects.filter(is_active=True).order_by("id")
+        if org_ids is not None:
+            org_qs = org_qs.filter(id__in=org_ids)
+        org = org_qs.first()
+
+        if org_ids is None:
+            users_count = User.objects.count()
+            departments_count = OrgUnit.objects.filter(is_active=True).count()
+        elif not org_ids:
+            users_count = 0
+            departments_count = 0
+        else:
+            users_count = (
+                OrganizationMember.objects.filter(
+                    organization_id__in=org_ids, is_active=True
+                )
+                .values("user_id")
+                .distinct()
+                .count()
+            )
+            departments_count = OrgUnit.objects.filter(
+                organization_id__in=org_ids, is_active=True
+            ).count()
         return Response(
             {
-                "users_count": len(COMPANY_USERS),
-                "departments_count": len(COMPANY_DEPARTMENTS),
+                "company_id": org.id if org else "",
+                "company_name": (org.name if org else "Компания"),
+                "users_count": users_count,
+                "users_total": users_count,
+                "departments_count": departments_count,
+                "departments_total": departments_count,
                 "invites_pending": len([x for x in COMPANY_INVITES if x["status"] == "pending"]),
+                "invites_pending_total": len([x for x in COMPANY_INVITES if x["status"] == "pending"]),
             }
         )
 
@@ -982,17 +1143,62 @@ class CompanyAdminUsersView(APIView):
             ["active", "invited", "blocked"],
         )
         department_id = request.query_params.get("department_id")
+        scope_org_ids = _company_scope_org_ids(request.user)
+        if scope_org_ids is not None and not scope_org_ids:
+            return Response({"count": 0, "results": []})
 
-        users = COMPANY_USERS
-        if q:
-            users = [u for u in users if _contains(u["name"], q) or _contains(u["email"], q)]
-        if role:
-            users = [u for u in users if u["role"] == role]
-        if status_param:
-            users = [u for u in users if u["status"] == status_param]
-        if department_id:
-            users = [u for u in users if u["department_id"] == _to_int(department_id, "department_id")]
-        return Response({"count": len(users), "results": users})
+        memberships = OrganizationMember.objects.filter(is_active=True)
+        if scope_org_ids is not None:
+            memberships = memberships.filter(organization_id__in=scope_org_ids)
+        membership_user_ids = set(memberships.values_list("user_id", flat=True))
+
+        role_assignments = UserRole.objects.filter(
+            role__code__in=["employee", "manager", "admin", "company_admin", "executive", "ceo"]
+        )
+        if scope_org_ids is not None:
+            role_assignments = role_assignments.filter(
+                Q(organization_id__in=scope_org_ids) | Q(organization_id__isnull=True)
+            )
+        role_user_ids = set(role_assignments.values_list("user_id", flat=True))
+
+        user_ids = sorted(membership_user_ids | role_user_ids)
+        if not user_ids:
+            return Response({"count": 0, "results": []})
+        company_org_id = _resolve_company_context_org_id(scope_org_ids)
+        if company_org_id:
+            _ensure_active_org_memberships(company_org_id, set(user_ids))
+
+        dept_by_user: dict[int, int | None] = {uid: None for uid in user_ids}
+        dept_rows = (
+            OrgUnitMember.objects.filter(user_id__in=user_ids)
+            .select_related("org_unit")
+            .order_by("-is_lead", "id")
+        )
+        for row in dept_rows:
+            if dept_by_user.get(row.user_id) is None:
+                dept_by_user[row.user_id] = row.org_unit_id
+
+        users_qs = User.objects.filter(id__in=user_ids).order_by("id")
+        results = []
+        for user_obj in users_qs:
+            item = {
+                "id": user_obj.id,
+                "name": (user_obj.get_full_name() or user_obj.username or "").strip() or user_obj.email or f"user-{user_obj.id}",
+                "email": user_obj.email or "",
+                "role": _primary_role_for_user(user_obj),
+                "status": _user_status_for_row(user_obj),
+                "department_id": dept_by_user.get(user_obj.id),
+            }
+            if q and not (_contains(item["name"], q) or _contains(item["email"], q)):
+                continue
+            if role and item["role"] != role:
+                continue
+            if status_param and item["status"] != status_param:
+                continue
+            if department_id and item["department_id"] != _to_int(department_id, "department_id"):
+                continue
+            results.append(item)
+        return Response({"count": len(results), "results": results})
 
 
 class CompanyAdminInvitesView(APIView):
@@ -1038,11 +1244,104 @@ class CompanyAdminUserRoleUpdateView(APIView):
         allowed_roles = ["employee", "manager", "company_admin"]
         if role not in allowed_roles:
             raise ValidationError({"detail": _invalid_enum_detail("role", allowed_roles)})
-        for user in COMPANY_USERS:
-            if user["id"] == user_id:
-                user["role"] = role
-                return Response(user)
-        raise NotFound(detail="User not found.")
+        target = User.objects.filter(pk=user_id).first()
+        if not target:
+            raise NotFound(detail="User not found.")
+
+        scope_org_ids = _company_scope_org_ids(request.user)
+        if scope_org_ids is not None and not OrganizationMember.objects.filter(
+            user=target, organization_id__in=scope_org_ids, is_active=True
+        ).exists():
+            if len(scope_org_ids) == 1:
+                membership, created = OrganizationMember.objects.get_or_create(
+                    user=target,
+                    organization_id=scope_org_ids[0],
+                    defaults={"is_active": True, "job_title": ""},
+                )
+                if not created and not membership.is_active:
+                    membership.is_active = True
+                    membership.save(update_fields=["is_active"])
+            else:
+                raise PermissionDenied("Нет доступа к пользователю.")
+
+        if role == "company_admin":
+            role_code = "admin"
+        else:
+            role_code = role
+        role_obj, _ = Role.objects.get_or_create(code=role_code, defaults={"name": role_code})
+
+        # Keep a single global company-role assignment for deterministic UI behavior.
+        UserRole.objects.filter(user=target, role__code__in=["employee", "manager", "company_admin", "admin"]).delete()
+        UserRole.objects.create(user=target, role=role_obj, organization=None)
+
+        previous_department_id = (
+            OrgUnitMember.objects.filter(user=target)
+            .order_by("-is_lead", "id")
+            .values_list("org_unit_id", flat=True)
+            .first()
+        )
+
+        # Optional department rebinding in the same request.
+        if "department_id" in request.data:
+            dept_val = request.data.get("department_id")
+            if dept_val in (None, "", "null"):
+                OrgUnitMember.objects.filter(user=target).update(is_lead=False)
+                OrgUnitMember.objects.filter(user=target).delete()
+            else:
+                dept_id = _to_int(str(dept_val), "department_id")
+                org_unit = OrgUnit.objects.filter(pk=dept_id, is_active=True).first()
+                if not org_unit:
+                    raise NotFound(detail="Department not found.")
+                if scope_org_ids is not None and org_unit.organization_id not in scope_org_ids:
+                    raise PermissionDenied("Нет доступа к выбранному отделу.")
+                membership, created = OrganizationMember.objects.get_or_create(
+                    user=target,
+                    organization_id=org_unit.organization_id,
+                    defaults={"is_active": True, "job_title": ""},
+                )
+                if not created and not membership.is_active:
+                    membership.is_active = True
+                    membership.save(update_fields=["is_active"])
+                OrgUnitMember.objects.filter(user=target).exclude(org_unit_id=org_unit.id).update(is_lead=False)
+                OrgUnitMember.objects.filter(user=target).exclude(org_unit_id=org_unit.id).delete()
+                OrgUnitMember.objects.get_or_create(
+                    org_unit=org_unit,
+                    user=target,
+                    defaults={"is_lead": False, "position": ""},
+                )
+
+        dept_id = (
+            OrgUnitMember.objects.filter(user=target)
+            .order_by("-is_lead", "id")
+            .values_list("org_unit_id", flat=True)
+            .first()
+        )
+        payload = {
+            "id": target.id,
+            "name": (target.get_full_name() or target.username or "").strip() or target.email or f"user-{target.id}",
+            "email": target.email or "",
+            "role": role,
+            "status": _user_status_for_row(target),
+            "department_id": dept_id,
+        }
+        if "department_id" in request.data and str(previous_department_id or "") != str(dept_id or ""):
+            try:
+                emit_audit_event(
+                    request,
+                    event_type="org.department_membership_changed",
+                    action="change_department_membership",
+                    entity_type="user",
+                    entity_id=str(target.id),
+                    department_id=str(dept_id or ""),
+                    payload={
+                        "user_id": target.id,
+                        "from_department_id": previous_department_id,
+                        "to_department_id": dept_id,
+                    },
+                )
+            except Exception:
+                pass
+        return Response(payload)
 
 
 class CompanyAdminInviteRevokeView(APIView):
@@ -1631,6 +1930,30 @@ def _required_task_patch_permissions(previous: dict, payload: dict) -> list[str]
     return list(dict.fromkeys(required or ["tasks.edit"]))
 
 
+def _is_self_status_only_patch(request, previous: dict, payload: dict) -> bool:
+    """
+    Allow assignees to move only their own task status without broad edit grant.
+
+    This keeps project/task hardening for all other mutable fields while enabling
+    an expected employee flow: todo -> in_progress -> done on assigned tasks.
+    """
+
+    keys = set(payload.keys())
+    if not keys or not keys.issubset({"status"}):
+        return False
+    status_value = payload.get("status")
+    if status_value not in {"todo", "in_progress", "done"}:
+        return False
+    actor_id = getattr(getattr(request, "user", None), "id", None)
+    if actor_id is None:
+        return False
+    try:
+        assignee_id = int(previous.get("assignee_id"))
+    except (TypeError, ValueError):
+        return False
+    return assignee_id == int(actor_id)
+
+
 class TasksView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1852,14 +2175,15 @@ class TaskDetailView(APIView):
             task["due_date"] = due_date.isoformat().replace("+00:00", "Z") if due_date else None
 
         _validate_task_relations(task)
-        for permission_code in _required_task_patch_permissions(previous, payload):
-            _require_project_task_permission(
-                request,
-                task,
-                permission_code,
-                "You do not have permission to update this task in its project.",
-                fallback_task=previous,
-            )
+        if not _is_self_status_only_patch(request, previous, payload):
+            for permission_code in _required_task_patch_permissions(previous, payload):
+                _require_project_task_permission(
+                    request,
+                    task,
+                    permission_code,
+                    "You do not have permission to update this task in its project.",
+                    fallback_task=previous,
+                )
         if "project_id" in payload and previous.get("project_id") not in (None, ""):
             _require_project_task_permission(
                 request,
@@ -2192,3 +2516,38 @@ class TaskActivityView(APIView):
                 "results": results,
             }
         )
+
+    @extend_schema(
+        operation_id="taskActivityCreate",
+        request=TaskActivityCreateSerializer,
+        responses={201: TaskActivityEventSerializer, 404: ErrorDetailSerializer},
+    )
+    def post(self, request, task_id: int):
+        task = _find_task(task_id)
+        if not task:
+            raise NotFound(detail="Task not found.")
+        _require_project_task_visibility(request, task)
+
+        serializer = TaskActivityCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        event_type = payload["event_type"]
+
+        event_payload: dict = {}
+        if event_type == "commented":
+            event_payload["message"] = payload["message"]
+        elif event_type == "attachment_added":
+            event_payload = {
+                "document_id": payload.get("document_id") or "",
+                "document_title": payload["document_title"],
+                "document_url": payload["document_url"],
+            }
+
+        _add_task_activity(
+            task_id=task["id"],
+            event_type=event_type,
+            request=request,
+            payload=event_payload,
+        )
+        task["updated_at"] = timezone.now().isoformat().replace("+00:00", "Z")
+        return Response(_task_activity_for(task_id)[-1], status=status.HTTP_201_CREATED)

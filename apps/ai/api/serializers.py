@@ -1,16 +1,26 @@
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.ai.models import AiRun
+from apps.ai.models import (
+    AiRun,
+    PersonalAIDocument,
+    PersonalAIPreference,
+    PersonalNote,
+    PersonalPromptTemplate,
+)
 from apps.llm_gateway.models import LlmRequestLog
 
 
 def _allowed_model_ids() -> set[str]:
-    return {
+    allowed = {
         str(entry.get("id"))
         for entry in (getattr(settings, "AI_CHAT_ALLOWED_MODELS", []) or [])
         if entry.get("id")
     }
+    image_client_id = str(getattr(settings, "HIGGSFIELD_CLIENT_MODEL_ID", "nano") or "").strip()
+    if image_client_id:
+        allowed.add(image_client_id)
+    return allowed
 
 
 class AiRunSerializer(serializers.ModelSerializer):
@@ -74,13 +84,15 @@ class AiRunLogSerializer(serializers.ModelSerializer):
 
 
 class AiChatCompletionsRequestSerializer(serializers.Serializer):
-    CONTEXT_CHOICES = ("project", "task", "document", "workspace")
+    CONTEXT_CHOICES = ("project", "department", "task", "document", "workspace")
 
     thread_id = serializers.IntegerField(min_value=1)
     message = serializers.CharField(allow_blank=False, trim_whitespace=True)
     model = serializers.CharField(required=False, allow_blank=False)
     context_type = serializers.ChoiceField(choices=CONTEXT_CHOICES, required=False)
     context_id = serializers.CharField(required=False, allow_blank=False)
+    aspect_ratio = serializers.CharField(required=False, allow_blank=False)
+    resolution = serializers.CharField(required=False, allow_blank=False)
 
     def validate_model(self, value: str) -> str:
         allowed = _allowed_model_ids()
@@ -108,3 +120,72 @@ class AiChatAllowedModelSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, default="")
     is_default = serializers.BooleanField(required=False, default=False)
     context_tokens = serializers.IntegerField(required=False, default=0)
+
+
+class PersonalAIPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalAIPreference
+        fields = (
+            "personal_ai_enabled",
+            "allowed_models",
+            "monthly_limit",
+            "can_upload_personal_docs",
+            "updated_at",
+        )
+        read_only_fields = ("updated_at",)
+
+
+class PersonalAIDocumentSerializer(serializers.ModelSerializer):
+    href = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PersonalAIDocument
+        fields = (
+            "id",
+            "title",
+            "document_type",
+            "href",
+            "external_href",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_href(self, obj: PersonalAIDocument) -> str:
+        request = self.context.get("request")
+        if obj.file and request is not None:
+            return request.build_absolute_uri(obj.file.url)
+        return (obj.external_href or "").strip()
+
+
+class PersonalAIDocumentCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalAIDocument
+        fields = ("title", "document_type", "external_href", "file")
+
+
+class PersonalAIDocumentShareToProjectSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField(min_value=1)
+
+
+class PersonalPromptTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalPromptTemplate
+        fields = ("id", "title", "content", "tags", "is_favorite", "created_at", "updated_at")
+
+
+class PersonalPromptTemplateCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalPromptTemplate
+        fields = ("title", "content", "tags", "is_favorite")
+
+
+class PersonalNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalNote
+        fields = ("id", "title", "content", "created_at", "updated_at")
+
+
+class PersonalNoteCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalNote
+        fields = ("title", "content")

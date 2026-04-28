@@ -8,13 +8,57 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.access.models import PermissionGrant, SCOPE_PROJECT
-from apps.access.service import grant_permission, revoke_permission
+from apps.access.service import UnknownPermission, grant_permission, revoke_permission
 from apps.audit.service import emit_audit_event
 from apps.organizations.models import OrganizationMember
 from apps.projects.lead_payload import project_lead_scoped_note
 from apps.projects.models import Project, ProjectMember
 
 User = get_user_model()
+
+
+def _grant_project_permission_with_fallback(
+    *,
+    employee,
+    primary_code: str,
+    fallback_codes: list[str],
+    scope_id: int,
+    grant_mode: str,
+    granted_by,
+    note: str,
+    request,
+) -> None:
+    """
+    Grant project-scoped permission resiliently:
+    - first, try the canonical project.* code;
+    - if it is not present in PermissionDefinition, fallback to legacy aliases.
+    """
+    codes = [primary_code, *fallback_codes]
+    last_error: UnknownPermission | None = None
+    for code in codes:
+        try:
+            grant_permission(
+                employee=employee,
+                permission_code=code,
+                scope_type=SCOPE_PROJECT,
+                scope_id=str(scope_id),
+                grant_mode=grant_mode,
+                granted_by=granted_by,
+                note=note,
+                request=request,
+            )
+            return
+        except UnknownPermission as exc:
+            last_error = exc
+            continue
+    raise ValidationError(
+        {
+            "detail": (
+                f"В каталоге прав нет permission definition для {primary_code} "
+                "(и fallback-кодов). Выполните seed_access_control."
+            )
+        }
+    ) from last_error
 
 
 def revoke_project_lead_scoped_grants(*, employee, project_id: int, revoked_by, request) -> int:
@@ -130,110 +174,110 @@ def assign_project_lead(
     note = project_lead_scoped_note(project.id)
     mode = PermissionGrant.GRANT_MODE_USE_AND_DELEGATE
     if grant_project_edit:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.edit",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.edit",
+            fallback_codes=[],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_assign_members:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.assign_members",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.assign_members",
+            fallback_codes=[],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_docs_view:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.docs.view",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.docs.view",
+            fallback_codes=["docs.view"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_docs_upload:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.docs.upload",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.docs.upload",
+            fallback_codes=["docs.upload"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_docs_edit:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.docs.edit",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.docs.edit",
+            fallback_codes=["docs.edit"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_docs_assign_editors:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.docs.assign_editors",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.docs.assign_editors",
+            fallback_codes=["docs.assign_editors"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_tasks_view:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.tasks.view",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.tasks.view",
+            fallback_codes=["tasks.view"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_tasks_create:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.tasks.create",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.tasks.create",
+            fallback_codes=["tasks.create"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_tasks_assign:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.tasks.assign",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.tasks.assign",
+            fallback_codes=["tasks.assign"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,
             request=request,
         )
     if grant_project_tasks_change_deadline:
-        grant_permission(
+        _grant_project_permission_with_fallback(
             employee=user,
-            permission_code="project.tasks.change_deadline",
-            scope_type=SCOPE_PROJECT,
-            scope_id=str(project.id),
+            primary_code="project.tasks.change_deadline",
+            fallback_codes=["tasks.change_deadline"],
+            scope_id=project.id,
             grant_mode=mode,
             granted_by=request.user,
             note=note,

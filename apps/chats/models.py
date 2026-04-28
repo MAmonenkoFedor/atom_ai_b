@@ -11,6 +11,20 @@ def chat_attachment_upload_to(instance: "ChatAttachment", filename: str) -> str:
 
 
 class Chat(models.Model):
+    SCOPE_PERSONAL = "personal"
+    SCOPE_DEPARTMENT = "department"
+    SCOPE_PROJECT = "project"
+    SCOPE_CHOICES = (
+        (SCOPE_PERSONAL, "Personal"),
+        (SCOPE_DEPARTMENT, "Department"),
+        (SCOPE_PROJECT, "Project"),
+    )
+    TYPE_GENERAL = "general"
+    TYPE_PROJECT = "project"
+    TYPE_CHOICES = (
+        (TYPE_GENERAL, "General"),
+        (TYPE_PROJECT, "Project"),
+    )
     STATUS_OPEN = "open"
     STATUS_CLOSED = "closed"
     STATUS_CHOICES = (
@@ -25,6 +39,15 @@ class Chat(models.Model):
         null=True,
         blank=True,
     )
+    org_unit = models.ForeignKey(
+        "orgstructure.OrgUnit",
+        on_delete=models.CASCADE,
+        related_name="chats",
+        null=True,
+        blank=True,
+    )
+    chat_type = models.CharField(max_length=32, choices=TYPE_CHOICES, default=TYPE_GENERAL)
+    chat_scope = models.CharField(max_length=32, choices=SCOPE_CHOICES, default=SCOPE_PERSONAL)
     title = models.CharField(max_length=255)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_OPEN)
     created_by = models.ForeignKey(

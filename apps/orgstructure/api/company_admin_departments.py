@@ -402,10 +402,21 @@ class CompanyAdminDepartmentLeadView(APIView):
             raise PermissionDenied("Нет доступа к этому отделу.")
 
         user = get_object_or_404(User, pk=uid)
-        if not OrganizationMember.objects.filter(
-            user=user, organization=ou.organization, is_active=True
-        ).exists():
-            raise ValidationError({"user_id": "Пользователь не состоит в этой организации."})
+        membership = OrganizationMember.objects.filter(
+            user=user,
+            organization=ou.organization,
+        ).first()
+        if membership is None:
+            # Пользователь может быть создан в "Аккаунтах" как платформенный.
+            # Для работы с отделом автоматически оформляем членство в организации.
+            OrganizationMember.objects.create(
+                user=user,
+                organization=ou.organization,
+                is_active=True,
+            )
+        elif not membership.is_active:
+            membership.is_active = True
+            membership.save(update_fields=["is_active"])
 
         old_lead_id = None
         prev = (

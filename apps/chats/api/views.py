@@ -14,6 +14,7 @@ from apps.chats.chat_attachments import (
 )
 from apps.chats.models import Chat, ChatMember, Message
 from django.contrib.auth import get_user_model
+from apps.organizations.models import OrganizationMember
 from apps.projects.project_permissions import (
     PROJECT_SCOPE,
     can_moderate_project_chat,
@@ -24,6 +25,7 @@ from .serializers import (
     ChatCreateSerializer,
     ChatMemberCreateSerializer,
     ChatMemberSerializer,
+    ChatShareCandidateSerializer,
     ChatMemberUpdateSerializer,
     ChatSerializer,
     ChatUpdateSerializer,
@@ -124,9 +126,18 @@ class ChatListCreateView(generics.ListCreateAPIView):
         status_param = self.request.query_params.get("status")
         sort = self.request.query_params.get("sort")
         project_id = self.request.query_params.get("project_id")
+        org_unit_id = self.request.query_params.get("org_unit_id")
+        chat_type = self.request.query_params.get("chat_type")
+        chat_scope = self.request.query_params.get("chat_scope")
 
         if project_id:
             qs = qs.filter(project_id=project_id)
+        if org_unit_id:
+            qs = qs.filter(org_unit_id=org_unit_id)
+        if chat_type:
+            qs = qs.filter(chat_type=chat_type)
+        if chat_scope:
+            qs = qs.filter(chat_scope=chat_scope)
         if q:
             qs = qs.filter(Q(title__icontains=q) | Q(project__name__icontains=q))
         if status_param:
@@ -330,6 +341,57 @@ class ChatMemberDetailView(APIView):
             payload={"member_user_id": user_id},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChatShareCandidatesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        q = (request.query_params.get("q") or "").strip()
+        org_ids = list(
+            OrganizationMember.objects.filter(user_id=request.user.id, is_active=True)
+            .values_list("organization_id", flat=True)
+        )
+        if not org_ids:
+            return Response({"results": []}, status=status.HTTP_200_OK)
+
+        members_qs = (
+            OrganizationMember.objects.select_related("user")
+            .filter(organization_id__in=org_ids, is_active=True, user__is_active=True)
+            .exclude(user_id=request.user.id)
+            .order_by("user__first_name", "user__last_name", "user__username", "user_id")
+        )
+        if q:
+            members_qs = members_qs.filter(
+                Q(user__first_name__icontains=q)
+                | Q(user__last_name__icontains=q)
+                | Q(user__username__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(job_title__icontains=q)
+            )
+
+        rows = []
+        seen_user_ids: set[int] = set()
+        for member in members_qs[:120]:
+            if member.user_id in seen_user_ids:
+                continue
+            seen_user_ids.add(member.user_id)
+            first_name = (member.user.first_name or "").strip()
+            last_name = (member.user.last_name or "").strip()
+            full_name = f"{first_name} {last_name}".strip() or member.user.username or f"User {member.user_id}"
+            rows.append(
+                {
+                    "user_id": member.user_id,
+                    "full_name": full_name,
+                    "email": member.user.email or "",
+                    "job_title": member.job_title or "",
+                }
+            )
+
+        return Response(
+            {"results": ChatShareCandidateSerializer(rows, many=True).data},
+            status=status.HTTP_200_OK,
+        )
 
 
 class ChatAttachmentsView(APIView):

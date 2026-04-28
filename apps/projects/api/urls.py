@@ -9,6 +9,7 @@ from .views import (
     ProjectLeadView,
     ProjectListView,
     ProjectMemberDetailView,
+    ProjectMemberCandidatesView,
     ProjectMembersView,
     ProjectResourceRequestCompanyListView,
     ProjectResourceRequestCreateView,
@@ -29,6 +30,11 @@ urlpatterns = [
     path("projects/<int:pk>/archive", ProjectArchiveView.as_view(), name="projects-archive"),
     path("projects/<int:pk>/restore", ProjectRestoreView.as_view(), name="projects-restore"),
     path("projects/<int:pk>/members", ProjectMembersView.as_view(), name="projects-members"),
+    path(
+        "projects/<int:pk>/member-candidates",
+        ProjectMemberCandidatesView.as_view(),
+        name="projects-member-candidates",
+    ),
     path(
         "projects/<int:pk>/members/<int:member_id>",
         ProjectMemberDetailView.as_view(),

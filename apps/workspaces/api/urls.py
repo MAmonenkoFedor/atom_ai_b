@@ -5,6 +5,7 @@ from .views import (
     BuildingDetailView,
     BuildingsListView,
     EmployeeMeProfileView,
+    EmployeeMeNotificationsView,
     EmployeeProfileByIdView,
     EmployeeProfileGlobalAliasView,
     EmployeeProfileView,
@@ -116,6 +117,7 @@ urlpatterns = [
         name="workspace-task-detail-alias",
     ),
     path("employees/me", EmployeeMeProfileView.as_view(), name="employees-me"),
+    path("employees/me/notifications", EmployeeMeNotificationsView.as_view(), name="employees-me-notifications"),
     path("employees/<str:employee_id>", EmployeeProfileByIdView.as_view(), name="employees-by-id"),
     path("workspace/quick-tasks", WorkspaceQuickTasksView.as_view(), name="workspace-quick-tasks"),
 ]

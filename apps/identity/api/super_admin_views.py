@@ -39,6 +39,7 @@ from apps.identity.capabilities import (
     is_known_capability,
 )
 from apps.identity.models import Role, UserCapability, UserRole
+from apps.organizations.models import Organization, OrganizationMember
 
 User = get_user_model()
 
@@ -73,6 +74,15 @@ def _normalize_role(code: str) -> str:
         return "company_admin"
     if code in {"ceo", "executive"}:
         return "executive"
+    return code
+
+
+def _role_storage_code(code: str) -> str:
+    """Map UI role aliases to DB role codes."""
+    if code == "company_admin":
+        return "admin"
+    if code == "executive":
+        return "ceo"
     return code
 
 
@@ -371,10 +381,48 @@ class InviteUserView(APIView):
                 first_name=full_name[:150] if full_name else "",
                 is_active=True,
             )
-            for role_code in payload.get("initial_roles", []) or []:
-                role = Role.objects.filter(code=role_code).first()
-                if role:
-                    UserRole.objects.get_or_create(user=user, role=role, organization=None)
+            initial_roles = payload.get("initial_roles", []) or []
+            normalized_role_codes = []
+            for code in initial_roles:
+                mapped = _role_storage_code((code or "").strip())
+                if mapped:
+                    normalized_role_codes.append(mapped)
+            normalized_role_codes = list(dict.fromkeys(normalized_role_codes))
+
+            parsed_org_ids: list[int] = []
+            for raw in payload.get("org_ids", []) or []:
+                s = str(raw).strip()
+                if s.isdigit():
+                    parsed_org_ids.append(int(s))
+            parsed_org_ids = list(dict.fromkeys(parsed_org_ids))
+            organizations = list(Organization.objects.filter(id__in=parsed_org_ids, is_active=True))
+            if not organizations:
+                default_org = Organization.objects.filter(is_active=True).order_by("id").first()
+                if default_org:
+                    organizations = [default_org]
+
+            if organizations:
+                for org in organizations:
+                    membership, created = OrganizationMember.objects.get_or_create(
+                        organization=org,
+                        user=user,
+                        defaults={"is_active": True, "job_title": ""},
+                    )
+                    if not created and not membership.is_active:
+                        membership.is_active = True
+                        membership.save(update_fields=["is_active"])
+
+                for role_code in normalized_role_codes:
+                    role = Role.objects.filter(code=role_code).first()
+                    if not role:
+                        continue
+                    for org in organizations:
+                        UserRole.objects.get_or_create(user=user, role=role, organization=org)
+            else:
+                for role_code in normalized_role_codes:
+                    role = Role.objects.filter(code=role_code).first()
+                    if role:
+                        UserRole.objects.get_or_create(user=user, role=role, organization=None)
 
         emit_audit_event(
             request,

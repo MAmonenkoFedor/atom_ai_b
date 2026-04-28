@@ -478,6 +478,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlatformUserListResponse'
           description: ''
+  /api/auth/csrf:
+    get:
+      operationId: auth_csrf_retrieve
+      description: Prime `csrftoken` cookie for SPA login (cross-origin POST /auth/login).
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
   /api/auth/invite/activate:
     post:
       operationId: authInviteActivate
@@ -655,6 +668,237 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmployeeProfile'
           description: ''
+  /api/buildings/{building_id}/floors/{floor_id}/tasks/{task_id}/audit:
+    get:
+      operationId: workspaceTaskBuildingAuditList
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/buildings/{building_id}/floors/{floor_id}/tasks/{task_id}/checklist:
+    get:
+      operationId: workspaceTaskBuildingChecklistList
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: workspaceTaskBuildingChecklistCreate
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/buildings/{building_id}/floors/{floor_id}/tasks/{task_id}/checklist/{item_id}:
+    patch:
+      operationId: workspaceTaskBuildingChecklistPatch
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: workspaceTaskBuildingChecklistDelete
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/buildings/{building_id}/floors/{floor_id}/tasks/{task_id}/comments:
+    get:
+      operationId: workspaceTaskBuildingCommentsList
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: workspaceTaskBuildingCommentsCreate
+      parameters:
+      - in: path
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - buildings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/buildings/{building_id}/floors/{floor_id}/workspace:
     get:
       operationId: floorWorkspace
@@ -748,7 +992,7 @@ paths:
           description: ''
   /api/company/admin/departments:
     get:
-      operationId: companyAdminDepartmentsList
+      operationId: company_admin_departments_retrieve
       tags:
       - company
       security:
@@ -756,13 +1000,84 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CompanyDepartmentSummary'
-          description: ''
+          description: No response body
+    post:
+      operationId: company_admin_departments_create
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/company/admin/departments/{department_id}:
+    patch:
+      operationId: company_admin_departments_partial_update
+      parameters:
+      - in: path
+        name: department_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: company_admin_departments_destroy
+      parameters:
+      - in: path
+        name: department_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/company/admin/departments/{department_id}/lead:
+    post:
+      operationId: company_admin_departments_lead_create
+      parameters:
+      - in: path
+        name: department_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: company_admin_departments_lead_destroy
+      description: Снять руководителя и отозвать выданные вместе с ним отдел-скоупы.
+      parameters:
+      - in: path
+        name: department_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - company
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/company/admin/invites:
     get:
       operationId: companyAdminInvitesList
@@ -1019,12 +1334,6 @@ paths:
     get:
       operationId: projects_list
       parameters:
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
       - name: page
         required: false
         in: query
@@ -1037,12 +1346,6 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
-      - name: search
-        required: false
-        in: query
-        description: A search term.
-        schema:
-          type: string
       tags:
       - projects
       security:
@@ -1289,6 +1592,39 @@ paths:
       responses:
         '204':
           description: Project member deleted
+  /api/projects/{id}/resource-requests:
+    post:
+      operationId: projectResourceRequestCreate
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectResourceRequestCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectResourceRequestCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectResourceRequestCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResourceRequest'
+          description: ''
   /api/projects/{id}/restore:
     post:
       operationId: projectRestore
@@ -1310,6 +1646,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
           description: ''
+  /api/projects/resource-requests:
+    get:
+      operationId: projectResourceRequestCompanyList
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectResourceRequest'
+          description: ''
+  /api/projects/resource-requests/{request_id}/resolve:
+    post:
+      operationId: projectResourceRequestResolve
+      parameters:
+      - in: path
+        name: request_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: Request marked closed
   /api/tasks:
     get:
       operationId: tasksList
@@ -1631,6 +2001,44 @@ paths:
                           assignee_id: 12
                         created_at: '2026-04-15T12:23:54.100000Z'
                   summary: Second cursor page
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: ''
+    post:
+      operationId: taskActivityCreate
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskActivityCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskActivityCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskActivityCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskActivityEvent'
           description: ''
         '404':
           content:
@@ -2016,6 +2424,237 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/workspace/tasks/{task_id}/audit:
+    get:
+      operationId: workspaceTaskAuditList
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/workspace/tasks/{task_id}/checklist:
+    get:
+      operationId: workspaceTaskChecklistList
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: workspaceTaskChecklistCreate
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskChecklistCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/workspace/tasks/{task_id}/checklist/{item_id}:
+    patch:
+      operationId: workspaceTaskChecklistPatch
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkspaceTaskChecklistPatch'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: workspaceTaskChecklistDelete
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/workspace/tasks/{task_id}/comments:
+    get:
+      operationId: workspaceTaskCommentsList
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: workspaceTaskCommentsCreate
+      parameters:
+      - in: query
+        name: building_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: floor_id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkspaceTaskCommentCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
 components:
   schemas:
     Activity:
@@ -2223,29 +2862,6 @@ components:
       - departments_count
       - invites_pending
       - users_count
-    CompanyDepartmentSummary:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        status:
-          $ref: '#/components/schemas/CompanyDepartmentSummaryStatusEnum'
-      required:
-      - id
-      - name
-      - status
-    CompanyDepartmentSummaryStatusEnum:
-      enum:
-      - green
-      - yellow
-      - red
-      type: string
-      description: |-
-        * `green` - green
-        * `yellow` - yellow
-        * `red` - red
     CompanyInvite:
       type: object
       properties:
@@ -2456,6 +3072,12 @@ components:
           type: string
         owner:
           type: string
+        href:
+          type: string
+        project_id:
+          type: string
+        project_name:
+          type: string
       required:
       - id
       - owner
@@ -2554,6 +3176,10 @@ components:
           type: string
         full_name:
           type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
         role:
           type: string
         title:
@@ -2564,6 +3190,10 @@ components:
           type: string
         status:
           type: string
+        presence_status:
+          type: string
+        work_status:
+          type: string
         role_source_of_truth:
           type: string
       required:
@@ -2572,7 +3202,6 @@ components:
       - full_name
       - id
       - role
-      - status
       - title
     EmployeeOwnerProfile:
       type: object
@@ -2693,6 +3322,14 @@ components:
           type: string
       required:
       - detail
+    EventTypeEnum:
+      enum:
+      - commented
+      - attachment_added
+      type: string
+      description: |-
+        * `commented` - commented
+        * `attachment_added` - attachment_added
     InviteActivate:
       type: object
       properties:
@@ -2792,9 +3429,21 @@ components:
       type: object
       properties:
         role:
-          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+          $ref: '#/components/schemas/RoleA97Enum'
+        project_function:
+          type: string
+          maxLength: 255
         is_active:
           type: boolean
+        engagement_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,3})?$
+          nullable: true
+        contribution_note:
+          type: string
+          description: e.g. part-time with another department lead
+          maxLength: 255
     PatchedProjectUpdate:
       type: object
       properties:
@@ -2805,6 +3454,12 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ProjectStatusEnum'
+        code:
+          type: string
+          maxLength: 64
+        primary_org_unit:
+          type: integer
+          nullable: true
     PatchedUpdateCompanyUserRoleRequest:
       type: object
       properties:
@@ -2813,6 +3468,12 @@ components:
     PatchedUpdateMyEmployeeProfile:
       type: object
       properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
         personal_email:
           type: string
           format: email
@@ -2829,6 +3490,10 @@ components:
         preferences:
           type: object
           additionalProperties: {}
+        presence_status:
+          $ref: '#/components/schemas/PresenceStatusEnum'
+        work_status:
+          $ref: '#/components/schemas/WorkStatusEnum'
     PatchedUpdateTaskRequest:
       type: object
       properties:
@@ -2871,6 +3536,16 @@ components:
         due:
           type: string
           nullable: true
+    PatchedWorkspaceTaskChecklistPatch:
+      type: object
+      properties:
+        title:
+          type: string
+        done:
+          type: boolean
+        position:
+          type: integer
+          minimum: 1
     Performance:
       type: object
       properties:
@@ -3023,6 +3698,22 @@ components:
       - id
       - name
       - role
+    PresenceStatusEnum:
+      enum:
+      - online
+      - idle
+      - offline
+      - in_call
+      - vacation
+      - sick
+      type: string
+      description: |-
+        * `online` - online
+        * `idle` - idle
+        * `offline` - offline
+        * `in_call` - in_call
+        * `vacation` - vacation
+        * `sick` - sick
     PriorityEnum:
       enum:
       - high
@@ -3042,6 +3733,9 @@ components:
         organization_id:
           type: integer
           readOnly: true
+        code:
+          type: string
+          maxLength: 64
         name:
           type: string
           maxLength: 255
@@ -3049,9 +3743,20 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ProjectStatusEnum'
-        created_by_id:
+        owner_id:
           type: integer
           readOnly: true
+        owner_name:
+          type: string
+          readOnly: true
+        primary_org_unit_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        primary_org_unit_name:
+          type: string
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -3060,12 +3765,67 @@ components:
           type: string
           format: date-time
           readOnly: true
+        context_counts:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        my_project_role:
+          type: string
+          nullable: true
+          readOnly: true
+        can_manage:
+          type: boolean
+          readOnly: true
+        capabilities:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        access_source:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: |-
+            Return source attribution only when the caller asks for it.
+
+            Enabled by ``?include=access_source`` to keep the default payload
+            small and to avoid leaking grant ids to non-admin clients.
+          readOnly: true
+        project_lead_id:
+          type: string
+          readOnly: true
+        project_lead:
+          type: string
+          readOnly: true
+        project_lead_email:
+          type: string
+          readOnly: true
+        lead_bundle_permissions:
+          type: array
+          items: {}
+          readOnly: true
+        lead_history:
+          type: array
+          items: {}
+          readOnly: true
       required:
+      - access_source
+      - can_manage
+      - capabilities
+      - context_counts
       - created_at
-      - created_by_id
       - id
+      - lead_bundle_permissions
+      - lead_history
+      - my_project_role
       - name
       - organization_id
+      - owner_id
+      - owner_name
+      - primary_org_unit_id
+      - primary_org_unit_name
+      - project_lead
+      - project_lead_email
+      - project_lead_id
       - updated_at
     ProjectCreate:
       type: object
@@ -3079,9 +3839,14 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ProjectStatusEnum'
+        code:
+          type: string
+          maxLength: 64
+        primary_org_unit:
+          type: integer
+          nullable: true
       required:
       - name
-      - organization
     ProjectMember:
       type: object
       properties:
@@ -3105,8 +3870,32 @@ components:
         last_name:
           type: string
           readOnly: true
-        role:
-          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+        employee_id:
+          type: string
+          readOnly: true
+        employee_name:
+          type: string
+          readOnly: true
+        employee_role:
+          type: string
+          readOnly: true
+        project_function:
+          type: string
+          readOnly: true
+        project_role:
+          type: string
+          readOnly: true
+        is_lead:
+          type: boolean
+        engagement_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,3})?$
+          nullable: true
+        contribution_note:
+          type: string
+          description: e.g. part-time with another department lead
+          maxLength: 255
         is_active:
           type: boolean
         joined_at:
@@ -3115,11 +3904,16 @@ components:
           readOnly: true
       required:
       - email
+      - employee_id
+      - employee_name
+      - employee_role
       - first_name
       - id
       - joined_at
       - last_name
       - project
+      - project_function
+      - project_role
       - user_id
       - username
     ProjectMemberCreate:
@@ -3128,21 +3922,78 @@ components:
         user:
           type: integer
         role:
-          $ref: '#/components/schemas/ProjectMemberRoleEnum'
+          $ref: '#/components/schemas/RoleA97Enum'
+        project_function:
+          type: string
+          maxLength: 255
         is_active:
           type: boolean
+        engagement_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,3})?$
+          nullable: true
+        contribution_note:
+          type: string
+          description: e.g. part-time with another department lead
+          maxLength: 255
       required:
       - user
-    ProjectMemberRoleEnum:
+    ProjectResourceRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project_id:
+          type: integer
+          readOnly: true
+        project_name:
+          type: string
+          readOnly: true
+        message:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectResourceRequestStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        requested_by_id:
+          type: integer
+          readOnly: true
+        requested_by_email:
+          type: string
+          readOnly: true
+        requested_by_name:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - project_id
+      - project_name
+      - requested_by_email
+      - requested_by_id
+      - requested_by_name
+    ProjectResourceRequestCreate:
+      type: object
+      properties:
+        message:
+          type: string
+          maxLength: 10000
+          minLength: 1
+      required:
+      - message
+    ProjectResourceRequestStatusEnum:
       enum:
-      - owner
-      - editor
-      - viewer
+      - open
+      - closed
       type: string
       description: |-
-        * `owner` - Owner
-        * `editor` - Editor
-        * `viewer` - Viewer
+        * `open` - Open
+        * `closed` - Closed
     ProjectStatusEnum:
       enum:
       - active
@@ -3165,6 +4016,12 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ProjectStatusEnum'
+        code:
+          type: string
+          maxLength: 64
+        primary_org_unit:
+          type: integer
+          nullable: true
       required:
       - name
     QuickTaskCreate:
@@ -3202,6 +4059,22 @@ components:
       description: |-
         * `success` - success
         * `failed` - failed
+    RoleA97Enum:
+      enum:
+      - owner
+      - lead
+      - manager
+      - editor
+      - contributor
+      - viewer
+      type: string
+      description: |-
+        * `owner` - Owner
+        * `lead` - Project lead
+        * `manager` - Project manager
+        * `editor` - Editor
+        * `contributor` - Contributor
+        * `viewer` - Viewer
     ScopeEnum:
       enum:
       - company
@@ -3247,10 +4120,42 @@ components:
         department:
           type: string
           readOnly: true
+        department_id:
+          type: string
+          readOnly: true
+        job_title:
+          type: string
+          readOnly: true
+        position:
+          type: string
+          readOnly: true
+        is_department_lead:
+          type: boolean
+          readOnly: true
+        manager_name:
+          type: string
+          readOnly: true
+        manager_id:
+          type: string
+          readOnly: true
+        project_leads:
+          type: string
+          readOnly: true
+        project_memberships:
+          type: string
+          readOnly: true
       required:
       - department
+      - department_id
       - id
+      - is_department_lead
+      - job_title
+      - manager_id
+      - manager_name
       - name
+      - position
+      - project_leads
+      - project_memberships
       - role
     SeverityEnum:
       enum:
@@ -3330,6 +4235,25 @@ components:
       - status
       - title
       - updated_at
+    TaskActivityCreate:
+      type: object
+      properties:
+        event_type:
+          $ref: '#/components/schemas/EventTypeEnum'
+        message:
+          type: string
+          maxLength: 4000
+        document_id:
+          type: string
+          maxLength: 128
+        document_title:
+          type: string
+          maxLength: 500
+        document_url:
+          type: string
+          maxLength: 4000
+      required:
+      - event_type
     TaskActivityEvent:
       type: object
       properties:
@@ -3497,6 +4421,20 @@ components:
       - id
       - name
       - status
+    WorkStatusEnum:
+      enum:
+      - on_track
+      - at_risk
+      - overloaded
+      - blocked
+      - high_performer
+      type: string
+      description: |-
+        * `on_track` - on_track
+        * `at_risk` - at_risk
+        * `overloaded` - overloaded
+        * `blocked` - blocked
+        * `high_performer` - high_performer
     Workspace:
       type: object
       properties:
@@ -3527,6 +4465,10 @@ components:
         quick_actions: {}
         stats: {}
         tasks_grouped: {}
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
         project_context: {}
         activity_feed: {}
         ai_context: {}
@@ -3535,9 +4477,11 @@ components:
           type: string
         contract_meta:
           $ref: '#/components/schemas/ContractMeta'
+        storage_hints: {}
       required:
       - activity_feed
       - ai_context
+      - documents
       - employee
       - greeting
       - project_context
@@ -3575,6 +4519,19 @@ components:
           type: string
         due:
           type: string
+        employee_id:
+          type: string
+        employee_name:
+          type: string
+        employee_role:
+          type: string
+        group:
+          type: string
+        project_id:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
       required:
       - column
       - due
@@ -3598,6 +4555,20 @@ components:
           type: string
       required:
       - title
+    WorkspaceTaskChecklistCreate:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+      - title
+    WorkspaceTaskCommentCreate:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
     Zone:
       type: object
       properties:

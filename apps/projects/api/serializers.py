@@ -233,6 +233,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ("organization", "name", "description", "status", "code", "primary_org_unit")
+        validators = []
 
     def validate(self, attrs):
         """
@@ -263,6 +264,12 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                         "в организации. Укажите organization в запросе или назначьте membership."
                     )
                 }
+            )
+
+        name = str(attrs.get("name") or "").strip()
+        if name and Project.objects.filter(organization=org, name=name).exists():
+            raise serializers.ValidationError(
+                {"name": "Проект с таким названием уже существует в этой организации."}
             )
 
         if attrs.get("primary_org_unit") is None:
@@ -334,6 +341,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
     employee_id = serializers.SerializerMethodField()
     employee_name = serializers.SerializerMethodField()
     employee_role = serializers.SerializerMethodField()
+    project_function = serializers.CharField(source="title_in_project", read_only=True)
 
     class Meta:
         model = ProjectMember
@@ -348,6 +356,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
             "employee_id",
             "employee_name",
             "employee_role",
+            "project_function",
             "project_role",
             "is_lead",
             "engagement_weight",
@@ -364,19 +373,48 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         return (u.get_full_name() or u.username or "").strip()
 
     def get_employee_role(self, obj: ProjectMember) -> str:
-        return ""
+        return (obj.title_in_project or "").strip()
 
 
 class ProjectMemberCreateSerializer(serializers.ModelSerializer):
+    project_function = serializers.CharField(
+        source="title_in_project",
+        required=False,
+        allow_blank=True,
+        max_length=255,
+    )
+
     class Meta:
         model = ProjectMember
-        fields = ("user", "role", "is_active", "engagement_weight", "contribution_note")
+        fields = (
+            "user",
+            "role",
+            "project_function",
+            "is_active",
+            "engagement_weight",
+            "contribution_note",
+        )
 
 
 class ProjectMemberUpdateSerializer(serializers.ModelSerializer):
+    project_function = serializers.CharField(
+        source="title_in_project",
+        required=False,
+        allow_blank=True,
+        max_length=255,
+    )
+
     class Meta:
         model = ProjectMember
-        fields = ("role", "is_active", "engagement_weight", "contribution_note")
+        fields = ("role", "project_function", "is_active", "engagement_weight", "contribution_note")
+
+
+class ProjectMemberCandidateSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    email = serializers.EmailField(allow_blank=True)
+    department_id = serializers.IntegerField(allow_null=True)
+    department_name = serializers.CharField(allow_blank=True)
 
 
 class ProjectDocumentLinkCreateSerializer(serializers.Serializer):

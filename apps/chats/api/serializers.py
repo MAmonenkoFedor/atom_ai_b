@@ -8,14 +8,19 @@ User = get_user_model()
 
 
 class ChatSerializer(serializers.ModelSerializer):
+    chat_scope = serializers.CharField(read_only=True)
     project_id = serializers.IntegerField(source="project.id", read_only=True)
+    org_unit_id = serializers.IntegerField(source="org_unit.id", read_only=True)
     created_by_id = serializers.IntegerField(source="created_by.id", read_only=True)
 
     class Meta:
         model = Chat
         fields = (
             "id",
+            "chat_type",
+            "chat_scope",
             "project_id",
+            "org_unit_id",
             "title",
             "status",
             "created_by_id",
@@ -25,9 +30,30 @@ class ChatSerializer(serializers.ModelSerializer):
 
 
 class ChatCreateSerializer(serializers.ModelSerializer):
+    chat_scope = serializers.ChoiceField(choices=[c[0] for c in Chat.SCOPE_CHOICES], required=False)
+
+    def validate(self, attrs):
+        scope = attrs.get("chat_scope") or Chat.SCOPE_PERSONAL
+        project = attrs.get("project")
+        org_unit = attrs.get("org_unit")
+        if scope == Chat.SCOPE_PROJECT and not project:
+            raise serializers.ValidationError({"project": "project is required for project scope chat."})
+        if scope == Chat.SCOPE_DEPARTMENT and not org_unit:
+            raise serializers.ValidationError({"org_unit": "org_unit is required for department scope chat."})
+        if scope == Chat.SCOPE_PERSONAL:
+            attrs["project"] = None
+            attrs["org_unit"] = None
+        elif scope == Chat.SCOPE_PROJECT:
+            attrs["org_unit"] = None
+        elif scope == Chat.SCOPE_DEPARTMENT:
+            attrs["project"] = None
+        attrs["chat_scope"] = scope
+        attrs["chat_type"] = Chat.TYPE_PROJECT if scope == Chat.SCOPE_PROJECT else Chat.TYPE_GENERAL
+        return attrs
+
     class Meta:
         model = Chat
-        fields = ("project", "title", "status")
+        fields = ("project", "org_unit", "chat_type", "chat_scope", "title", "status")
 
 
 class ChatUpdateSerializer(serializers.ModelSerializer):
@@ -87,3 +113,10 @@ class ChatMemberCreateSerializer(serializers.Serializer):
 
 class ChatMemberUpdateSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=[ChatMember.ROLE_OWNER, ChatMember.ROLE_MEMBER])
+
+
+class ChatShareCandidateSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    email = serializers.EmailField(allow_blank=True)
+    job_title = serializers.CharField(allow_blank=True)

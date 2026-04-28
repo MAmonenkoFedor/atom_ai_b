@@ -175,6 +175,18 @@ GEMINI_BASE_URL = env(
 OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
 OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
 DEFAULT_AI_MODEL = env("DEFAULT_AI_MODEL", default="openai/gpt-4o-mini")
+# Higgsfield image/video queue API (https://platform.higgsfield.ai/...).
+# UI still sends client model id "nano" by default; map via HIGGSFIELD_CLIENT_MODEL_ID.
+HIGGSFIELD_CLIENT_MODEL_ID = env("HIGGSFIELD_CLIENT_MODEL_ID", default="nano")
+HIGGSFIELD_API_KEY = env("HIGGSFIELD_API_KEY", default="")
+HIGGSFIELD_API_SECRET = env("HIGGSFIELD_API_SECRET", default="")
+HIGGSFIELD_BASE_URL = env("HIGGSFIELD_BASE_URL", default="https://platform.higgsfield.ai")
+# Path segment after base URL, e.g. higgsfield-ai/soul/standard
+HIGGSFIELD_MODEL_PATH = env("HIGGSFIELD_MODEL_PATH", default="higgsfield-ai/soul/standard")
+HIGGSFIELD_DEFAULT_ASPECT_RATIO = env("HIGGSFIELD_DEFAULT_ASPECT_RATIO", default="16:9")
+HIGGSFIELD_DEFAULT_RESOLUTION = env("HIGGSFIELD_DEFAULT_RESOLUTION", default="720p")
+HIGGSFIELD_POLL_INTERVAL_SEC = float(env.str("HIGGSFIELD_POLL_INTERVAL_SEC", default="2.0"))
+HIGGSFIELD_POLL_TIMEOUT_SEC = env.int("HIGGSFIELD_POLL_TIMEOUT_SEC", default=180)
 AI_CHAT_MAX_TOKENS = env.int("AI_CHAT_MAX_TOKENS", default=800)
 AI_CHAT_HISTORY_LIMIT = env.int("AI_CHAT_HISTORY_LIMIT", default=20)
 AI_CHAT_RATE_LIMIT_USER_PER_MINUTE = env.int("AI_CHAT_RATE_LIMIT_USER_PER_MINUTE", default=20)

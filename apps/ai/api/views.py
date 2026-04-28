@@ -11,12 +11,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.audit.service import emit_audit_event
-from apps.ai.models import AiRun
+from apps.ai.models import AiRun, PersonalAIPreference
 from apps.chats.models import Chat, ChatAttachment, Message
 from apps.llm_gateway.models import LlmRequestLog
 from apps.llm_gateway.services import LlmGatewayService
 from apps.organizations.models import OrganizationMember
-from apps.projects.models import Project, ProjectDocument
+from apps.orgstructure.models import OrgUnit
+from apps.projects.models import Project, ProjectDocument, ProjectMember
 from apps.workspaces.models import WorkspaceCabinetDocument
 from apps.workspaces import data as workspace_data
 
@@ -27,8 +28,16 @@ from .serializers import (
     AiRunExecuteSerializer,
     AiRunLogSerializer,
     AiRunSerializer,
+    PersonalAIDocumentCreateSerializer,
+    PersonalAIDocumentShareToProjectSerializer,
+    PersonalAIDocumentSerializer,
+    PersonalAIPreferenceSerializer,
+    PersonalNoteCreateSerializer,
+    PersonalNoteSerializer,
+    PersonalPromptTemplateCreateSerializer,
+    PersonalPromptTemplateSerializer,
 )
-from apps.ai.providers import OpenRouterProvider
+from apps.ai.providers import HiggsfieldProvider, OpenRouterProvider
 
 
 class AiModelsListView(APIView):
@@ -64,6 +73,203 @@ class AiModelsListView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class PersonalAIPreferenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        pref, _ = _ensure_personal_preference(request.user)
+        return Response(PersonalAIPreferenceSerializer(pref).data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        pref, _ = _ensure_personal_preference(request.user)
+        serializer = PersonalAIPreferenceSerializer(pref, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        emit_audit_event(
+            request,
+            event_type="ai.personal_preference_updated",
+            entity_type="ai_personal_preference",
+            action="update",
+            entity_id=str(pref.pk),
+            payload={"fields": sorted(serializer.validated_data.keys())},
+        )
+        return Response(PersonalAIPreferenceSerializer(pref).data, status=status.HTTP_200_OK)
+
+
+class PersonalAIDocumentsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = (
+            request.user.personal_ai_documents.all()
+            .order_by("-updated_at", "-id")
+        )
+        return Response(
+            {"results": PersonalAIDocumentSerializer(rows, many=True, context={"request": request}).data},
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        pref, _ = _ensure_personal_preference(request.user)
+        if not pref.personal_ai_enabled:
+            raise ValidationError({"detail": "Personal AI is disabled for this account."})
+        if not pref.can_upload_personal_docs:
+            raise ValidationError({"detail": "Uploading personal AI documents is disabled for this account."})
+
+        serializer = PersonalAIDocumentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data.get("external_href") and not serializer.validated_data.get("file"):
+            raise ValidationError({"detail": "Provide either file or external_href."})
+        doc = serializer.save(user=request.user)
+        emit_audit_event(
+            request,
+            event_type="ai.personal_document_created",
+            entity_type="ai_personal_document",
+            action="create",
+            entity_id=str(doc.pk),
+            payload={"document_type": doc.document_type, "title_len": len(doc.title or "")},
+        )
+        return Response(
+            PersonalAIDocumentSerializer(doc, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PersonalAIDocumentDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk: int):
+        doc = generics.get_object_or_404(request.user.personal_ai_documents, pk=pk)
+        doc.delete()
+        emit_audit_event(
+            request,
+            event_type="ai.personal_document_deleted",
+            entity_type="ai_personal_document",
+            action="delete",
+            entity_id=str(pk),
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PersonalAIDocumentShareToProjectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        doc = generics.get_object_or_404(request.user.personal_ai_documents, pk=pk)
+        serializer = PersonalAIDocumentShareToProjectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        project_id = serializer.validated_data["project_id"]
+        project = generics.get_object_or_404(Project, pk=project_id)
+        membership = (
+            ProjectMember.objects.filter(project_id=project.pk, user_id=request.user.id, is_active=True)
+            .order_by("-joined_at", "-id")
+            .first()
+        )
+        if membership is None or membership.role == ProjectMember.ROLE_VIEWER:
+            raise PermissionDenied("Недостаточно прав для передачи документа в этот проект.")
+
+        pdoc = ProjectDocument.objects.create(
+            project=project,
+            uploaded_by=request.user,
+            title=doc.title,
+            document_type=doc.document_type[:16] or "doc",
+            source=ProjectDocument.Source.EXTERNAL if doc.external_href else ProjectDocument.Source.UPLOAD,
+            external_href=doc.external_href or "",
+            file=doc.file,
+            owner_label=(request.user.get_full_name() or request.user.username or "Personal AI"),
+        )
+        emit_audit_event(
+            request,
+            event_type="ai.personal_document_shared_to_project",
+            entity_type="project_document",
+            action="create",
+            entity_id=str(pdoc.pk),
+            project_id=str(project.pk),
+            payload={"personal_document_id": doc.pk, "title": pdoc.title},
+        )
+        return Response(pdoc.to_api_dict(request), status=status.HTTP_201_CREATED)
+
+
+class PersonalPromptsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = request.user.personal_prompt_templates.all().order_by("-is_favorite", "-updated_at", "-id")
+        return Response(
+            {"results": PersonalPromptTemplateSerializer(rows, many=True).data},
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        pref, _ = _ensure_personal_preference(request.user)
+        if not pref.personal_ai_enabled:
+            raise ValidationError({"detail": "Personal AI is disabled for this account."})
+        serializer = PersonalPromptTemplateCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save(user=request.user)
+        emit_audit_event(
+            request,
+            event_type="ai.personal_prompt_created",
+            entity_type="ai_personal_prompt",
+            action="create",
+            entity_id=str(item.pk),
+        )
+        return Response(PersonalPromptTemplateSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class PersonalPromptDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk: int):
+        item = generics.get_object_or_404(request.user.personal_prompt_templates, pk=pk)
+        serializer = PersonalPromptTemplateCreateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(PersonalPromptTemplateSerializer(item).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk: int):
+        item = generics.get_object_or_404(request.user.personal_prompt_templates, pk=pk)
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PersonalNotesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = request.user.personal_ai_notes.all().order_by("-updated_at", "-id")
+        return Response({"results": PersonalNoteSerializer(rows, many=True).data}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        pref, _ = _ensure_personal_preference(request.user)
+        if not pref.personal_ai_enabled:
+            raise ValidationError({"detail": "Personal AI is disabled for this account."})
+        serializer = PersonalNoteCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        note = serializer.save(user=request.user)
+        return Response(PersonalNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+
+class PersonalNoteDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk: int):
+        note = generics.get_object_or_404(request.user.personal_ai_notes, pk=pk)
+        serializer = PersonalNoteCreateSerializer(note, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(PersonalNoteSerializer(note).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk: int):
+        note = generics.get_object_or_404(request.user.personal_ai_notes, pk=pk)
+        note.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _ensure_personal_preference(user):
+    return PersonalAIPreference.objects.get_or_create(user=user)
 
 
 class AiRunCreateView(generics.CreateAPIView):
@@ -291,6 +497,7 @@ class AiRunLogsView(generics.ListAPIView):
 class AiChatCompletionsView(APIView):
     permission_classes = [IsAuthenticated]
     provider = OpenRouterProvider()
+    higgsfield = HiggsfieldProvider()
 
     def post(self, request):
         serializer = AiChatCompletionsRequestSerializer(data=request.data)
@@ -358,7 +565,21 @@ class AiChatCompletionsView(APIView):
         llm_messages.append({"role": "user", "content": user_message.content})
 
         try:
-            result = self.provider.chat_completions(messages=llm_messages, model=model, max_tokens=max_tokens)
+            client_image_id = str(getattr(settings, "HIGGSFIELD_CLIENT_MODEL_ID", "nano") or "").strip()
+            if client_image_id and model == client_image_id:
+                ar = (data.get("aspect_ratio") or "").strip() or None
+                res = (data.get("resolution") or "").strip() or None
+                result = self.higgsfield.generate_image(
+                    prompt=(user_message.content or "").strip(),
+                    aspect_ratio=ar,
+                    resolution=res,
+                )
+            else:
+                result = self.provider.chat_completions(
+                    messages=llm_messages,
+                    model=model,
+                    max_tokens=max_tokens,
+                )
         except RuntimeError as exc:
             emit_audit_event(
                 request,
@@ -453,10 +674,51 @@ class AiChatCompletionsView(APIView):
     def _resolve_context_text(self, *, request, chat: Chat, context_type: str, context_id: str) -> str:
         if context_type == "project":
             project = generics.get_object_or_404(Project, pk=context_id)
+            members_qs = (
+                ProjectMember.objects.select_related("user")
+                .filter(project_id=project.pk, is_active=True)
+                .order_by("joined_at", "id")
+            )
+            member_lines: list[str] = []
+            for member in members_qs[:12]:
+                display = (member.user.get_full_name() or member.user.username or "").strip() or f"user-{member.user_id}"
+                role_label = member.role
+                member_lines.append(f"- {display} ({role_label})")
+            docs_qs = (
+                ProjectDocument.objects.filter(project_id=project.pk)
+                .order_by("-updated_at", "-id")
+            )
+            doc_lines: list[str] = []
+            for doc in docs_qs[:12]:
+                doc_lines.append(f"- {doc.title} [{doc.document_type}]")
+            members_block = "\n".join(member_lines) if member_lines else "- none"
+            docs_block = "\n".join(doc_lines) if doc_lines else "- none"
             return (
                 f"Project context:\n"
                 f"id={project.pk}\nname={project.name}\nstatus={project.status}\n"
-                f"description={project.description or '-'}"
+                f"description={project.description or '-'}\n"
+                f"members_count={members_qs.count()}\n"
+                f"documents_count={docs_qs.count()}\n"
+                f"members:\n{members_block}\n"
+                f"documents:\n{docs_block}"
+            )
+        if context_type == "department":
+            org_unit = generics.get_object_or_404(OrgUnit.objects.select_related("organization"), pk=context_id)
+            member_qs = org_unit.members.select_related("user").order_by("-is_lead", "joined_at", "id")
+            lines: list[str] = []
+            for membership in member_qs[:12]:
+                display = (
+                    membership.user.get_full_name() or membership.user.username or f"user-{membership.user_id}"
+                )
+                suffix = "lead" if membership.is_lead else (membership.position or "member")
+                lines.append(f"- {display} ({suffix})")
+            members_block = "\n".join(lines) if lines else "- none"
+            return (
+                f"Department context:\n"
+                f"id={org_unit.pk}\nname={org_unit.name}\norganization_id={org_unit.organization_id}\n"
+                f"description={org_unit.description or '-'}\n"
+                f"members_count={member_qs.count()}\n"
+                f"members:\n{members_block}"
             )
         if context_type == "document":
             try:

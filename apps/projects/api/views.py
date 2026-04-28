@@ -33,6 +33,7 @@ from .serializers import (
     ProjectCreateSerializer,
     ProjectDocumentLinkCreateSerializer,
     ProjectMemberCreateSerializer,
+    ProjectMemberCandidateSerializer,
     ProjectMemberSerializer,
     ProjectMemberUpdateSerializer,
     ProjectResourceRequestCreateSerializer,
@@ -423,6 +424,8 @@ class ProjectMembersView(generics.ListCreateAPIView):
             "role": serializer.validated_data.get("role", ProjectMember.ROLE_EDITOR),
             "is_active": serializer.validated_data.get("is_active", True),
         }
+        if "title_in_project" in serializer.validated_data:
+            defaults["title_in_project"] = serializer.validated_data["title_in_project"] or ""
         if "engagement_weight" in serializer.validated_data:
             defaults["engagement_weight"] = serializer.validated_data["engagement_weight"]
         if "contribution_note" in serializer.validated_data:
@@ -442,6 +445,60 @@ class ProjectMembersView(generics.ListCreateAPIView):
             payload={"employee_id": str(member.user_id), "role": member.role},
         )
         return Response(ProjectMemberSerializer(member).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectMemberCandidatesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="projectMemberCandidatesList",
+        responses={200: ProjectMemberCandidateSerializer(many=True)},
+    )
+    def get(self, request, pk: int):
+        project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
+        require_project_action(
+            request.user,
+            project,
+            "project.assign_members",
+            "You do not have permission to manage project members.",
+        )
+
+        org_memberships = list(
+            OrganizationMember.objects.filter(
+                organization_id=project.organization_id,
+                is_active=True,
+                user__is_active=True,
+            )
+            .select_related("user")
+            .order_by("user__first_name", "user__last_name", "user__username")
+        )
+        user_ids = [m.user_id for m in org_memberships]
+        first_dept_by_user: dict[int, tuple[int, str]] = {}
+        if user_ids:
+            for row in (
+                OrgUnitMember.objects.filter(user_id__in=user_ids, org_unit__is_active=True)
+                .select_related("org_unit")
+                .order_by("user_id", "id")
+            ):
+                if row.user_id in first_dept_by_user:
+                    continue
+                first_dept_by_user[row.user_id] = (row.org_unit_id, row.org_unit.name or "")
+
+        data = []
+        for membership in org_memberships:
+            user = membership.user
+            full_name = (user.get_full_name() or user.username or "").strip()
+            dep = first_dept_by_user.get(user.id)
+            data.append(
+                {
+                    "id": user.id,
+                    "full_name": full_name,
+                    "email": user.email or "",
+                    "department_id": dep[0] if dep else None,
+                    "department_name": dep[1] if dep else "",
+                }
+            )
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ProjectMemberDetailView(APIView):

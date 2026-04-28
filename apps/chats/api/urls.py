@@ -7,6 +7,7 @@ from .views import (
     ChatListCreateView,
     ChatMemberDetailView,
     ChatMembersView,
+    ChatShareCandidatesView,
     ChatMessagesView,
 )
 
@@ -22,4 +23,5 @@ urlpatterns = [
     path("chats/<int:pk>/messages", ChatMessagesView.as_view(), name="chats-messages"),
     path("chats/<int:pk>/members", ChatMembersView.as_view(), name="chats-members"),
     path("chats/<int:pk>/members/<int:user_id>", ChatMemberDetailView.as_view(), name="chats-member-detail"),
+    path("chats/share-candidates", ChatShareCandidatesView.as_view(), name="chats-share-candidates"),
 ]

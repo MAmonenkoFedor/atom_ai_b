@@ -56,3 +56,80 @@ class AiRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.id}:{self.status}"
+
+
+class PersonalAIPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_ai_preference",
+    )
+    personal_ai_enabled = models.BooleanField(default=True)
+    allowed_models = models.JSONField(default=list, blank=True)
+    monthly_limit = models.PositiveIntegerField(default=100000)
+    can_upload_personal_docs = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("user_id",)
+
+    def __str__(self) -> str:
+        return f"personal-ai:{self.user_id}:{'on' if self.personal_ai_enabled else 'off'}"
+
+
+class PersonalAIDocument(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_ai_documents",
+    )
+    title = models.CharField(max_length=500)
+    document_type = models.CharField(max_length=32, default="doc")
+    file = models.FileField(upload_to="personal_ai_docs/", blank=True, null=True)
+    external_href = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+
+    def __str__(self) -> str:
+        return f"personal-doc:{self.user_id}:{self.title[:32]}"
+
+
+class PersonalPromptTemplate(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_prompt_templates",
+    )
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    tags = models.JSONField(default=list, blank=True)
+    is_favorite = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-is_favorite", "-updated_at", "-id")
+
+    def __str__(self) -> str:
+        return f"prompt:{self.user_id}:{self.title[:32]}"
+
+
+class PersonalNote(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_ai_notes",
+    )
+    title = models.CharField(max_length=255)
+    content = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+
+    def __str__(self) -> str:
+        return f"note:{self.user_id}:{self.title[:32]}"
