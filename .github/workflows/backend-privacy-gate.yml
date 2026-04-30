@@ -1,0 +1,127 @@
+name: Backend Privacy Gate
+
+on:
+  pull_request:
+    paths:
+      - "**/*.py"
+      - "requirements/**/*.txt"
+      - "scripts/audit_gate.ps1"
+      - "apps/access/**"
+      - "apps/ai/**"
+      - "apps/workspaces/**"
+      - "apps/projects/**"
+      - ".github/workflows/backend-privacy-gate.yml"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "**/*.py"
+      - "requirements/**/*.txt"
+      - "scripts/audit_gate.ps1"
+      - "apps/access/**"
+      - "apps/ai/**"
+      - "apps/workspaces/**"
+      - "apps/projects/**"
+      - ".github/workflows/backend-privacy-gate.yml"
+
+jobs:
+  privacy-gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: atom_ai
+          POSTGRES_USER: atom_ai
+          POSTGRES_PASSWORD: atom_ai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atom_ai -d atom_ai"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DJANGO_SECRET_KEY: ci-secret-key
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost"
+      DATABASE_URL: "postgresql://atom_ai:atom_ai@localhost:5432/atom_ai"
+      POSTGRES_DB: atom_ai
+      POSTGRES_USER: atom_ai
+      POSTGRES_PASSWORD: atom_ai
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      REDIS_URL: "redis://localhost:6379/0"
+      CELERY_BROKER_URL: "redis://localhost:6379/1"
+      CELERY_RESULT_BACKEND: "redis://localhost:6379/2"
+      LLM_GATEWAY_MOCK_MODE: "True"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements/local.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/local.txt
+
+      - name: Wait for PostgreSQL
+        run: |
+          python - <<'PY'
+          import socket
+          import time
+
+          deadline = time.time() + 60
+          while time.time() < deadline:
+              sock = socket.socket()
+              sock.settimeout(1)
+              try:
+                  sock.connect(("127.0.0.1", 5432))
+                  print("PostgreSQL is reachable")
+                  break
+              except OSError:
+                  time.sleep(1)
+              finally:
+                  sock.close()
+          else:
+              raise SystemExit("PostgreSQL is not reachable on 127.0.0.1:5432")
+          PY
+
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+
+      - name: Django checks
+        run: python manage.py check
+
+      - name: Seed access control
+        run: python manage.py seed_access_control
+
+      - name: Validate privacy defaults
+        run: python manage.py check_access_privacy_defaults
+
+      - name: Run privacy-focused tests
+        run: |
+          python manage.py test \
+            apps.access.tests \
+            apps.ai.tests.test_chat_workspace_privacy \
+            apps.workspaces.tests \
+            apps.projects.tests

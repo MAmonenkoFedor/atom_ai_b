@@ -84,3 +84,22 @@ celery -A config worker -l info
   - `BACKEND_HANDOFF.md`
 - Employee vertical packet:
   - `EMPLOYEE_BACKEND_PACKET.md`
+
+## 7) Quality gate (audit-ready)
+
+Run before merge/handoff:
+
+```powershell
+cd d:\ATOM_AI_backend
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py seed_access_control
+.\.venv\Scripts\python.exe manage.py check_access_privacy_defaults
+.\.venv\Scripts\python.exe manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls
+powershell -ExecutionPolicy Bypass -File .\scripts\audit_gate.ps1 -BaseUrl http://127.0.0.1:8000/api -Mode Fast
+```
+
+Before release/handoff to external stakeholders, run `Full` mode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\audit_gate.ps1 -BaseUrl http://127.0.0.1:8000/api -Mode Full
+```

@@ -58,9 +58,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\audit_gate.ps1 -BaseUrl http:
 Gate включает:
 
 1. `python manage.py check`
-2. `python manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls`
-3. `SMOKE_RUNNER.ps1` (`Fast` или `Full`)
-4. JSON-отчет smoke для артефактов handoff
+2. `python manage.py seed_access_control`
+3. `python manage.py check_access_privacy_defaults`
+4. `python manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls`
+5. `SMOKE_RUNNER.ps1` (`Fast` или `Full`)
+6. JSON-отчет smoke для артефактов handoff
+
+Privacy note:
+- `check_access_privacy_defaults` обязателен для контроля policy-инварианта:
+  - `company_admin_base` по умолчанию содержит только `ai.workspace.view_metadata`;
+  - `ai.workspace.view_content` не должен включаться в шаблон по умолчанию.
 
 ## 6. Definition of Done (DoD) для backend-задачи
 

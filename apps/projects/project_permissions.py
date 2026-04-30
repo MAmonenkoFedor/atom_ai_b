@@ -290,19 +290,65 @@ def is_project_lead(user, project: Project) -> bool:
     return membership.role == ProjectMember.ROLE_LEAD
 
 
-def require_view_project(user, project: Project) -> None:
-    if not can_view_project(user, project):
+def require_view_project(user, project: Project):
+    """Gate project visibility via ``resolve_access`` (read or metadata-only)."""
+
+    from apps.access.policies import resolve_access
+
+    d = resolve_access(
+        user=user,
+        action="project.read",
+        scope_type="project",
+        scope_id=str(project.pk),
+        resource=project,
+    )
+    if d.allowed:
+        return d
+    d2 = resolve_access(
+        user=user,
+        action="project.view_metadata",
+        scope_type="project",
+        scope_id=str(project.pk),
+        resource=project,
+    )
+    if not d2.allowed:
         raise PermissionDenied("You do not have access to this project.")
+    return d2
 
 
-def require_manage_project(user, project: Project) -> None:
-    if not can_manage_project(user, project):
+def require_manage_project(user, project: Project):
+    """Legacy manage gate: membership manage roles (owner/lead/manager/editor)."""
+
+    decision = compute_project_policy_decision(user, project)
+    if decision.access_level not in {"manage", "admin"}:
         raise PermissionDenied("Only project owner or editor can modify this project.")
+    return decision
 
 
-def require_project_action(user, project: Project, permission_code: str, message: str) -> None:
-    if not can_project_action(user, project, permission_code):
+_LEGACY_PERMISSION_TO_ACTION: dict[str, str] = {
+    "project.edit": "project.update",
+    "project.assign_members": "project.manage_members",
+}
+
+
+def require_project_action(user, project: Project, permission_code: str, message: str):
+    action = _LEGACY_PERMISSION_TO_ACTION.get(permission_code, permission_code)
+    return require_project_access(user, project, action, message)
+
+
+def require_project_access(user, project: Project, action: str, message: str):
+    from apps.access.policies import resolve_access
+
+    d = resolve_access(
+        user=user,
+        action=action,
+        scope_type="project",
+        scope_id=str(project.pk),
+        resource=project,
+    )
+    if not d.allowed:
         raise PermissionDenied(message)
+    return d
 
 
 def require_project_rights_delegation(user, project: Project) -> None:
@@ -365,6 +411,103 @@ def can_moderate_project_chat(user, project: Project) -> bool:
 
 def can_delegate_project_rights(user, project: Project) -> bool:
     return has_project_access_permission(user, project, "project.assign_rights")
+
+
+def compute_project_policy_decision(user, project: Project):
+    """Derive maximum project access level for ``resolve_access`` / audits."""
+
+    from apps.access.policies import PolicyDecision
+
+    subject_id = int(getattr(user, "id", 0) or 0)
+    scope_sid = str(project.pk)
+    object_id = int(project.pk)
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return PolicyDecision(
+            allowed=False,
+            access_level="none",
+            reason="anonymous",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if bool(getattr(user, "is_superuser", False)):
+        return PolicyDecision(
+            allowed=True,
+            access_level="admin",
+            reason="superuser",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if is_privileged_project_viewer(user):
+        return PolicyDecision(
+            allowed=True,
+            access_level="admin",
+            reason="privileged_company_role",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if can_manage_project(user, project):
+        return PolicyDecision(
+            allowed=True,
+            access_level="manage",
+            reason="membership_manage",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if can_project_action(user, project, "project.edit", legacy_manage=True):
+        return PolicyDecision(
+            allowed=True,
+            access_level="write",
+            reason="permission:project.edit",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if can_view_project(user, project):
+        return PolicyDecision(
+            allowed=True,
+            access_level="read",
+            reason="project_visibility",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    if has_project_access_permission(user, project, "project.view_metadata"):
+        return PolicyDecision(
+            allowed=True,
+            access_level="metadata",
+            reason="permission:project.view_metadata",
+            scope_type="project",
+            scope_id=scope_sid,
+            subject_id=subject_id,
+            object_id=object_id,
+        )
+
+    return PolicyDecision(
+        allowed=False,
+        access_level="none",
+        reason="no_permission",
+        scope_type="project",
+        scope_id=scope_sid,
+        subject_id=subject_id,
+        object_id=object_id,
+    )
 
 
 # ---------------------------------------------------------------------------

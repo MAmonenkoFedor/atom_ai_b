@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.access.policies import policy_audit_payload, resolve_access
 from apps.audit.service import emit_audit_event
 from apps.core.api.permissions import IsCompanyAdminOrSuperAdmin, normalized_roles_for_user
 from apps.organizations.models import OrganizationMember
@@ -23,6 +24,7 @@ from apps.projects.lead_payload import batch_project_lead_payload
 from apps.projects.models import Project, ProjectMember, ProjectResourceRequest
 from apps.projects.project_lead import assign_project_lead, clear_project_lead, get_project_for_lead_endpoint
 from apps.projects.project_permissions import (
+    require_project_access,
     require_project_action,
     require_view_project,
 )
@@ -172,6 +174,14 @@ class ProjectListView(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         organization = serializer.validated_data["organization"]
+        create_decision = resolve_access(
+            user=request.user,
+            action="project.create",
+            scope_type="project",
+            resource=organization,
+        )
+        if not create_decision.allowed:
+            raise PermissionDenied("You do not have permission to create projects.")
         owner_user = self._resolve_project_owner_user(request, organization)
         project = serializer.save(created_by=owner_user)
         ProjectMember.objects.update_or_create(
@@ -193,7 +203,11 @@ class ProjectListView(generics.ListCreateAPIView):
             action="create",
             entity_id=str(project.pk),
             project_id=str(project.pk),
-            payload={"name": project.name, "status": project.status},
+            payload={
+                "name": project.name,
+                "status": project.status,
+                **policy_audit_payload(create_decision),
+            },
         )
         out_ctx = self.get_serializer_context()
         out_ctx["project_lead_payload"] = batch_project_lead_payload([project.pk])
@@ -295,7 +309,7 @@ class ProjectDetailView(generics.RetrieveAPIView):
 
     def patch(self, request, *args, **kwargs):
         project = self.get_object()
-        require_project_action(
+        decision = require_project_action(
             request.user,
             project,
             "project.edit",
@@ -312,7 +326,10 @@ class ProjectDetailView(generics.RetrieveAPIView):
             action="update",
             entity_id=str(project.pk),
             project_id=str(project.pk),
-            payload={"fields": sorted(serializer.validated_data.keys())},
+            payload={
+                "fields": sorted(serializer.validated_data.keys()),
+                **policy_audit_payload(decision),
+            },
         )
         return Response(
             ProjectSerializer(updated, context=self.get_serializer_context()).data,
@@ -330,10 +347,10 @@ class ProjectArchiveView(APIView):
     )
     def post(self, request, pk: int):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
-        require_project_action(
+        decision = require_project_access(
             request.user,
             project,
-            "project.edit",
+            "project.archive",
             "You do not have permission to archive this project.",
         )
         project.status = Project.STATUS_ARCHIVED
@@ -346,6 +363,7 @@ class ProjectArchiveView(APIView):
             action="archive",
             entity_id=str(pk),
             project_id=str(pk),
+            payload=policy_audit_payload(decision),
         )
         return Response(
             ProjectSerializer(
@@ -366,10 +384,10 @@ class ProjectRestoreView(APIView):
     )
     def post(self, request, pk: int):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
-        require_project_action(
+        decision = require_project_access(
             request.user,
             project,
-            "project.edit",
+            "project.archive",
             "You do not have permission to restore this project.",
         )
         if project.status == Project.STATUS_ARCHIVED:
@@ -383,6 +401,7 @@ class ProjectRestoreView(APIView):
             action="restore",
             entity_id=str(pk),
             project_id=str(pk),
+            payload=policy_audit_payload(decision),
         )
         return Response(
             ProjectSerializer(
@@ -412,7 +431,7 @@ class ProjectMembersView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=self.kwargs["pk"])
-        require_project_action(
+        decision = require_project_action(
             request.user,
             project,
             "project.assign_members",
@@ -442,7 +461,11 @@ class ProjectMembersView(generics.ListCreateAPIView):
             action="upsert",
             entity_id=str(member.pk),
             project_id=str(project.pk),
-            payload={"employee_id": str(member.user_id), "role": member.role},
+            payload={
+                "employee_id": str(member.user_id),
+                "role": member.role,
+                **policy_audit_payload(decision),
+            },
         )
         return Response(ProjectMemberSerializer(member).data, status=status.HTTP_201_CREATED)
 
@@ -526,6 +549,13 @@ class ProjectMemberDetailView(APIView):
                     {"detail": "Pending members may only PATCH {\"is_active\": true} to accept the invitation."}
                 )
             serializer.save()
+            read_decision = resolve_access(
+                user=request.user,
+                action="project.read",
+                scope_type="project",
+                scope_id=str(pk),
+                resource=project,
+            )
             emit_audit_event(
                 request,
                 event_type="project.member_self_activated",
@@ -533,14 +563,17 @@ class ProjectMemberDetailView(APIView):
                 action="update",
                 entity_id=str(member.pk),
                 project_id=str(pk),
-                payload={"employee_id": str(member.user_id)},
+                payload={
+                    "employee_id": str(member.user_id),
+                    **policy_audit_payload(read_decision),
+                },
             )
             member.refresh_from_db()
             return Response(ProjectMemberSerializer(member).data, status=status.HTTP_200_OK)
 
         serializer = ProjectMemberUpdateSerializer(member, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        require_project_action(
+        decision = require_project_action(
             request.user,
             project,
             "project.assign_members",
@@ -554,7 +587,10 @@ class ProjectMemberDetailView(APIView):
             action="update",
             entity_id=str(member.pk),
             project_id=str(pk),
-            payload={"fields": sorted(serializer.validated_data.keys())},
+            payload={
+                "fields": sorted(serializer.validated_data.keys()),
+                **policy_audit_payload(decision),
+            },
         )
         member.refresh_from_db()
         return Response(ProjectMemberSerializer(member).data, status=status.HTTP_200_OK)
@@ -566,7 +602,7 @@ class ProjectMemberDetailView(APIView):
     )
     def delete(self, request, pk: int, member_id: int):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
-        require_project_action(
+        decision = require_project_action(
             request.user,
             project,
             "project.assign_members",
@@ -586,7 +622,10 @@ class ProjectMemberDetailView(APIView):
             action="delete",
             entity_id=str(member_id),
             project_id=str(pk),
-            payload={"employee_id": str(member_user_id)},
+            payload={
+                "employee_id": str(member_user_id),
+                **policy_audit_payload(decision),
+            },
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -598,6 +637,20 @@ class ProjectDocumentsListView(APIView):
     def get(self, request, pk: int):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
         docs = project_documents_service.list_project_documents(request, project)
+        has_content_links = any(bool((row.get("href") or "").strip()) for row in docs)
+        emit_audit_event(
+            request,
+            event_type=(
+                "project.document_content_accessed"
+                if has_content_links
+                else "project.document_metadata_accessed"
+            ),
+            entity_type="project_document",
+            action=("read" if has_content_links else "view_metadata"),
+            entity_id="",
+            project_id=str(pk),
+            payload={"count": len(docs)},
+        )
         return Response(docs)
 
 
@@ -694,7 +747,7 @@ class ProjectResourceRequestCreateView(APIView):
     )
     def post(self, request, pk: int):
         project = generics.get_object_or_404(projects_queryset_with_annotations(request.user), pk=pk)
-        require_project_action(
+        decision = require_project_action(
             request.user,
             project,
             "project.assign_members",
@@ -715,7 +768,7 @@ class ProjectResourceRequestCreateView(APIView):
             action="create",
             entity_id=str(req.pk),
             project_id=str(project.pk),
-            payload={"project_name": project.name},
+            payload={"project_name": project.name, **policy_audit_payload(decision)},
         )
         return Response(ProjectResourceRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 

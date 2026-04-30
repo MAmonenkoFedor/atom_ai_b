@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 from django.utils.text import get_valid_filename
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.access.policies import resolve_access
 from apps.storage.credentials_vault import decrypt_credentials_field
 from apps.storage.enforcement import assert_workspace_upload_allowed
 from apps.storage.router import get_default_object_storage_provider
 from apps.storage import s3_runtime
 from apps.workspaces.models import WorkspaceCabinetDocument
+
+def _as_metadata_only(doc: dict) -> dict:
+    row = dict(doc)
+    row["href"] = ""
+    return row
+
 
 _ALLOWED_DOC_UPLOAD_SUFFIXES = frozenset(
     {
@@ -93,18 +101,50 @@ def list_workspace_documents(request) -> list[dict]:
     from apps.workspaces import data as workspace_data
 
     user = request.user
+    resource = SimpleNamespace(user_id=user.id, id=None)
+    read_decision = resolve_access(
+        user=user,
+        action="document.read",
+        scope_type="document",
+        scope_id=str(user.id),
+        resource=resource,
+    )
+    if not read_decision.allowed:
+        metadata_decision = resolve_access(
+            user=user,
+            action="document.view_metadata",
+            scope_type="document",
+            scope_id=str(user.id),
+            resource=resource,
+        )
+        if not metadata_decision.allowed:
+            raise PermissionDenied("You do not have permission to view workspace documents.")
+
     employee_id = workspace_data.resolve_employee_id_for_username(user.username)
     qs = WorkspaceCabinetDocument.objects.filter(user=user).order_by("-updated_at")
-    rows = list(qs)
-    if not rows:
-        rows = _seed_defaults_for_user(user, employee_id)
-    return [obj.to_api_dict(request) for obj in rows]
+    orm_rows = list(qs)
+    if not orm_rows:
+        orm_rows = _seed_defaults_for_user(user, employee_id)
+
+    payloads = [obj.to_api_dict(request) for obj in orm_rows]
+    if read_decision.allowed:
+        return payloads
+    return [_as_metadata_only(row) for row in payloads]
 
 
 def create_workspace_document_link(request, title: str, url: str) -> dict:
     from apps.workspaces import data as workspace_data
 
     user = request.user
+    decision = resolve_access(
+        user=user,
+        action="document.share",
+        scope_type="document",
+        scope_id=str(user.id),
+        resource=SimpleNamespace(user_id=user.id, id=None),
+    )
+    if not decision.allowed:
+        raise PermissionDenied("You do not have permission to create workspace document links.")
     employee_id = workspace_data.resolve_employee_id_for_username(user.username)
     owner = _owner_label(employee_id)
     obj = WorkspaceCabinetDocument.objects.create(
@@ -122,6 +162,15 @@ def create_workspace_document_upload(request, upload) -> dict:
     from apps.workspaces import data as workspace_data
 
     user = request.user
+    decision = resolve_access(
+        user=user,
+        action="document.upload",
+        scope_type="document",
+        scope_id=str(user.id),
+        resource=SimpleNamespace(user_id=user.id, id=None),
+    )
+    if not decision.allowed:
+        raise PermissionDenied("You do not have permission to upload workspace documents.")
     employee_id = workspace_data.resolve_employee_id_for_username(user.username)
     owner = _owner_label(employee_id)
 

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.cache import cache
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError, PermissionDenied
@@ -18,7 +19,9 @@ from apps.orgstructure.models import OrgUnit
 from apps.projects.models import Project, ProjectDocument, ProjectMember
 from apps.workspaces.models import WorkspaceCabinetDocument
 from apps.workspaces import data as workspace_data
-from apps.access.policies import resolve_ai_workspace_access
+from apps.access.policies import resolve_access
+
+User = get_user_model()
 
 from .serializers import (
     AiChatAllowedModelSerializer,
@@ -715,11 +718,15 @@ class AiChatCompletionsView(APIView):
                 owner_user_id = int(wdoc.user_id)
                 requester_user_id = int(request.user.id)
                 if owner_user_id != requester_user_id:
-                    decision = resolve_ai_workspace_access(
-                        viewer=request.user,
-                        owner_user_id=owner_user_id,
+                    decision = resolve_access(
+                        user=request.user,
+                        action="ai.workspace.view_metadata",
+                        scope_type="ai_workspace",
+                        scope_id=str(owner_user_id),
                     )
-                    if not decision.can_view_content and not decision.can_view_metadata:
+                    can_view_content = decision.access_level in {"read", "write", "manage", "admin"}
+                    can_view_metadata = decision.access_level in {"metadata", "read", "write", "manage", "admin"}
+                    if not can_view_content and not can_view_metadata:
                         emit_audit_event(
                             request,
                             event_type="ai.workspace_content_access_denied",
@@ -735,7 +742,7 @@ class AiChatCompletionsView(APIView):
                         )
                         raise PermissionDenied("Недостаточно прав для доступа к личной AI-зоне сотрудника.")
 
-                    if decision.can_view_content:
+                    if can_view_content:
                         emit_audit_event(
                             request,
                             event_type="ai.workspace_content_accessed",
@@ -776,14 +783,83 @@ class AiChatCompletionsView(APIView):
                 )
             raise ValidationError({"context_id": "Document not found."})
         if context_type == "workspace":
-            employee_id = workspace_data.resolve_employee_id_for_username(request.user.username)
-            payload = workspace_data.get_employee_workspace(request, "employee")
+            target_user_id = self._workspace_context_target_user_id(request=request, context_id=context_id)
+            decision = None
+            if int(target_user_id) != int(request.user.id):
+                decision = resolve_access(
+                    user=request.user,
+                    action="ai.workspace.view_metadata",
+                    scope_type="ai_workspace",
+                    scope_id=str(target_user_id),
+                )
+                can_view_content = decision.access_level in {"read", "write", "manage", "admin"}
+                can_view_metadata = decision.access_level in {"metadata", "read", "write", "manage", "admin"}
+                if not can_view_content and not can_view_metadata:
+                    emit_audit_event(
+                        request,
+                        event_type="ai.workspace_content_access_denied",
+                        entity_type="workspace_context",
+                        action="deny",
+                        entity_id=str(target_user_id),
+                        payload={
+                            "owner_user_id": int(target_user_id),
+                            "requester_user_id": int(request.user.id),
+                            "reason": decision.reason,
+                            "mode": "workspace_context",
+                        },
+                    )
+                    raise PermissionDenied("Недостаточно прав для доступа к личной AI-зоне сотрудника.")
+
+                if can_view_content:
+                    emit_audit_event(
+                        request,
+                        event_type="ai.workspace_content_accessed",
+                        entity_type="workspace_context",
+                        action="view_content",
+                        entity_id=str(target_user_id),
+                        payload={
+                            "owner_user_id": int(target_user_id),
+                            "requester_user_id": int(request.user.id),
+                            "reason": decision.reason,
+                            "mode": "workspace_context",
+                        },
+                    )
+                else:
+                    emit_audit_event(
+                        request,
+                        event_type="ai.workspace_metadata_accessed",
+                        entity_type="workspace_context",
+                        action="view_metadata",
+                        entity_id=str(target_user_id),
+                        payload={
+                            "owner_user_id": int(target_user_id),
+                            "requester_user_id": int(request.user.id),
+                            "reason": decision.reason,
+                            "mode": "workspace_context",
+                        },
+                    )
+                    return (
+                        "Workspace context metadata:\n"
+                        f"user_id={target_user_id}\n"
+                        "profile_name=(hidden: requires ai.workspace.view_content)\n"
+                        "tasks_count=(hidden)\n"
+                        "documents_count=(hidden)"
+                    )
+
+            target_user = User.objects.filter(pk=target_user_id).only("id", "username").first()
+            if target_user is None:
+                raise ValidationError({"context_id": "Workspace owner not found."})
+
+            employee_id = workspace_data.resolve_employee_id_for_username(target_user.username)
+            owner_profile = workspace_data.get_employee_owner_profile(employee_id)
+            task_rows = workspace_data.list_workspace_tasks(employee_id)
             return (
                 f"Workspace context:\n"
+                f"user_id={target_user_id}\n"
                 f"employee_id={employee_id}\n"
-                f"profile_name={(payload.get('profile') or {}).get('name', '')}\n"
-                f"tasks_count={len(payload.get('tasks') or [])}\n"
-                f"documents_count={len(payload.get('documents') or [])}"
+                f"profile_name={(owner_profile.get('header') or {}).get('full_name', '')}\n"
+                f"tasks_count={len(task_rows)}\n"
+                f"documents_count={len(owner_profile.get('projects') or [])}"
             )
         if context_type == "task":
             # Tasks are currently sourced from workspace data; no dedicated DB model yet.
@@ -795,6 +871,17 @@ class AiChatCompletionsView(APIView):
                 f"project_id={task.get('project_id') or ''}\nsummary={task.get('summary') or ''}"
             )
         raise ValidationError({"context_type": f"Unsupported context_type '{context_type}'."})
+
+    @staticmethod
+    def _workspace_context_target_user_id(*, request, context_id: str) -> int:
+        raw = str(context_id or "").strip().lower()
+        if raw in {"me", "self", "workspace", "current"}:
+            return int(request.user.id)
+        if raw.isdigit():
+            return int(raw)
+        raise ValidationError(
+            {"context_id": "Workspace context_id must be user id or one of: me, self, workspace, current."}
+        )
 
     def _enforce_rate_limits(self, request, thread_id: int, *, organization_id: int | None = None):
         user_limit = int(settings.AI_CHAT_RATE_LIMIT_USER_PER_MINUTE)

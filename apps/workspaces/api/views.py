@@ -8,7 +8,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.access.policies import policy_audit_payload
 from apps.audit.service import emit_audit_event
+from apps.workspaces.task_policy import (
+    require_workspace_task_access,
+    require_workspace_task_read_or_metadata,
+)
 from apps.audit.models import AuditEvent
 from apps.identity.api.serializers import SessionUserSerializer
 from apps.orgstructure.models import OrgUnit
@@ -392,6 +397,20 @@ class EmployeeWorkspaceCabinetView(APIView):
     def get(self, request):
         viewer_role = _resolve_viewer_role(request.user)
         payload = data.get_employee_workspace(request, viewer_role)
+        docs = payload.get("documents") or []
+        has_content_links = any(bool((row.get("href") or "").strip()) for row in docs)
+        emit_audit_event(
+            request,
+            event_type=(
+                "workspace.document_content_accessed"
+                if has_content_links
+                else "workspace.document_metadata_accessed"
+            ),
+            entity_type="workspace_document",
+            action=("read" if has_content_links else "view_metadata"),
+            entity_id="",
+            payload={"count": len(docs)},
+        )
         return Response(WorkspaceEmployeeCabinetSerializer(payload).data)
 
 
@@ -405,6 +424,14 @@ class WorkspaceDocumentUploadView(APIView):
         if not upload:
             raise ValidationError({"file": "No file uploaded."})
         doc = documents_service.create_workspace_document_upload(request, upload)
+        emit_audit_event(
+            request,
+            event_type="workspace.document_uploaded",
+            entity_type="workspace_document",
+            action="create",
+            entity_id=str(doc.get("id") or ""),
+            payload={"title": doc.get("title"), "type": doc.get("type")},
+        )
         return Response(DocumentSerializer(doc).data, status=201)
 
 
@@ -423,6 +450,14 @@ class WorkspaceDocumentLinkView(APIView):
             request,
             serializer.validated_data["title"],
             str(serializer.validated_data["url"]),
+        )
+        emit_audit_event(
+            request,
+            event_type="workspace.document_shared",
+            entity_type="workspace_document",
+            action="share",
+            entity_id=str(doc.get("id") or ""),
+            payload={"title": doc.get("title"), "type": "link"},
         )
         return Response(DocumentSerializer(doc).data, status=201)
 
@@ -514,6 +549,9 @@ class WorkspaceQuickTasksView(APIView):
         serializer = QuickTaskCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        tdec = require_workspace_task_access(
+            request.user, employee_id, "task.create", task_id=None, message="You cannot create tasks here."
+        )
         payload = data.create_workspace_quick_task(
             employee_id=employee_id,
             title=serializer.validated_data["title"],
@@ -538,7 +576,7 @@ class WorkspaceQuickTasksView(APIView):
             entity_id=str(payload["task_id"]),
             project_id=str(payload.get("project_id") or ""),
             task_id=str(payload["task_id"]),
-            payload={"title": payload.get("title", ""), "slot": payload.get("slot", "")},
+            payload={"title": payload.get("title", ""), "slot": payload.get("slot", ""), **policy_audit_payload(tdec)},
         )
         return Response(QuickTaskCreateResponseSerializer(payload).data, status=201)
 
@@ -549,6 +587,12 @@ def _require_workspace_scope_query(request):
     if not building_id or not floor_id:
         raise ValidationError({"detail": "building_id and floor_id query params are required."})
     return str(building_id), str(floor_id)
+
+
+def _workspace_task_patch_action(validated_keys: set[str]) -> str:
+    if {"column", "status"} & validated_keys:
+        return "task.change_status"
+    return "task.update"
 
 
 def _workspace_actor(request) -> tuple[str, str]:
@@ -581,6 +625,9 @@ class WorkspaceTasksAliasView(APIView):
     def get(self, request):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=None, message="You cannot list workspace tasks."
+        )
         payload = data.list_workspace_tasks(
             employee_id,
             {
@@ -606,6 +653,9 @@ class WorkspaceTasksAliasView(APIView):
         serializer = WorkspaceTaskAliasCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        tdec = require_workspace_task_access(
+            request.user, employee_id, "task.create", task_id=None, message="You cannot create tasks here."
+        )
         payload = data.create_workspace_task(employee_id, serializer.validated_data)
         actor_name, actor_role = _workspace_actor(request)
         data.append_workspace_task_audit(
@@ -624,7 +674,11 @@ class WorkspaceTasksAliasView(APIView):
             entity_id=str(payload["id"]),
             project_id=str(payload.get("project_id") or ""),
             task_id=str(payload["id"]),
-            payload={"title": payload.get("title", ""), "column": payload.get("column", "")},
+            payload={
+                "title": payload.get("title", ""),
+                "column": payload.get("column", ""),
+                **policy_audit_payload(tdec),
+            },
         )
         return Response(TaskSerializer(payload).data, status=201)
 
@@ -642,6 +696,9 @@ class WorkspaceTaskAuditView(APIView):
     def get(self, request, task_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_audit_events(employee_id, task_id)
         return Response(payload)
 
@@ -659,6 +716,9 @@ class WorkspaceTaskCommentsView(APIView):
     def get(self, request, task_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_comments(employee_id, task_id)
         return Response(payload)
 
@@ -675,6 +735,9 @@ class WorkspaceTaskCommentsView(APIView):
         serializer = WorkspaceTaskCommentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        tdec = require_workspace_task_access(
+            request.user, employee_id, "task.comment", task_id=task_id, message="You cannot comment on this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.add_workspace_task_comment(
             employee_id,
@@ -698,7 +761,10 @@ class WorkspaceTaskCommentsView(APIView):
             action="create",
             entity_id="",
             task_id=str(task_id),
-            payload={"message_len": len(serializer.validated_data["message"])},
+            payload={
+                "message_len": len(serializer.validated_data["message"]),
+                **policy_audit_payload(tdec),
+            },
         )
         return Response(status=204)
 
@@ -716,6 +782,9 @@ class WorkspaceTaskChecklistView(APIView):
     def get(self, request, task_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_checklist(employee_id, task_id)
         return Response(payload)
 
@@ -732,6 +801,9 @@ class WorkspaceTaskChecklistView(APIView):
         serializer = WorkspaceTaskChecklistCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.add_workspace_task_checklist_item(employee_id, task_id, serializer.validated_data["title"])
         data.append_workspace_task_audit(
@@ -761,6 +833,9 @@ class WorkspaceTaskChecklistItemView(APIView):
         serializer = WorkspaceTaskChecklistPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.patch_workspace_task_checklist_item(employee_id, task_id, item_id, serializer.validated_data)
         data.append_workspace_task_audit(
@@ -783,6 +858,9 @@ class WorkspaceTaskChecklistItemView(APIView):
     def delete(self, request, task_id: str, item_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.delete_workspace_task_checklist_item(employee_id, task_id, item_id)
         data.append_workspace_task_audit(
@@ -810,6 +888,9 @@ class WorkspaceTaskAliasDetailView(APIView):
     def get(self, request, task_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.get_workspace_task(employee_id, task_id)
         return Response(TaskSerializer(payload).data)
 
@@ -827,10 +908,27 @@ class WorkspaceTaskAliasDetailView(APIView):
         serializer = WorkspaceTaskAliasPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        patch_action = _workspace_task_patch_action(set(serializer.validated_data.keys()))
+        tdec = require_workspace_task_access(
+            request.user,
+            employee_id,
+            patch_action,
+            task_id=task_id,
+            message="You cannot update this task.",
+        )
         payload = data.patch_workspace_task(employee_id, task_id, serializer.validated_data)
         actor_name, actor_role = _workspace_actor(request)
         changed = ",".join(sorted(serializer.validated_data.keys())) or "updated"
         data.append_workspace_task_audit(employee_id, task_id, "updated", actor_name, actor_role, changed)
+        emit_audit_event(
+            request,
+            event_type="workspace.task_updated",
+            entity_type="workspace_task",
+            action="update",
+            entity_id=str(task_id),
+            task_id=str(task_id),
+            payload={"fields": sorted(serializer.validated_data.keys()), **policy_audit_payload(tdec)},
+        )
         return Response(TaskSerializer(payload).data)
 
     @extend_schema(
@@ -844,9 +942,21 @@ class WorkspaceTaskAliasDetailView(APIView):
     def delete(self, request, task_id: str):
         _require_workspace_scope_query(request)
         employee_id = data.resolve_employee_id_for_username(request.user.username)
+        tdec = require_workspace_task_access(
+            request.user, employee_id, "task.delete", task_id=task_id, message="You cannot delete this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.append_workspace_task_audit(employee_id, task_id, "deleted", actor_name, actor_role, "Task deleted")
         data.delete_workspace_task(employee_id, task_id)
+        emit_audit_event(
+            request,
+            event_type="workspace.task_deleted",
+            entity_type="workspace_task",
+            action="delete",
+            entity_id=str(task_id),
+            task_id=str(task_id),
+            payload=policy_audit_payload(tdec),
+        )
         return Response(status=204)
 
 
@@ -865,6 +975,9 @@ class WorkspaceTaskBuildingAuditView(APIView):
     @extend_schema(operation_id="workspaceTaskBuildingAuditList")
     def get(self, request, building_id: str, floor_id: str, task_id: str):
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_audit_events(employee_id, task_id)
         return Response(payload)
 
@@ -875,6 +988,9 @@ class WorkspaceTaskBuildingCommentsView(APIView):
     @extend_schema(operation_id="workspaceTaskBuildingCommentsList")
     def get(self, request, building_id: str, floor_id: str, task_id: str):
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_comments(employee_id, task_id)
         return Response(payload)
 
@@ -886,6 +1002,9 @@ class WorkspaceTaskBuildingCommentsView(APIView):
         serializer = WorkspaceTaskCommentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        tdec = require_workspace_task_access(
+            request.user, employee_id, "task.comment", task_id=task_id, message="You cannot comment on this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.add_workspace_task_comment(
             employee_id,
@@ -902,6 +1021,18 @@ class WorkspaceTaskBuildingCommentsView(APIView):
             actor_role,
             "Comment added",
         )
+        emit_audit_event(
+            request,
+            event_type="workspace.task_commented",
+            entity_type="workspace_task_comment",
+            action="create",
+            entity_id="",
+            task_id=str(task_id),
+            payload={
+                "message_len": len(serializer.validated_data["message"]),
+                **policy_audit_payload(tdec),
+            },
+        )
         return Response(status=204)
 
 
@@ -911,6 +1042,9 @@ class WorkspaceTaskBuildingChecklistView(APIView):
     @extend_schema(operation_id="workspaceTaskBuildingChecklistList")
     def get(self, request, building_id: str, floor_id: str, task_id: str):
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_read_or_metadata(
+            request.user, employee_id, task_id=task_id, message="You cannot view this task."
+        )
         payload = data.list_workspace_task_checklist(employee_id, task_id)
         return Response(payload)
 
@@ -922,6 +1056,9 @@ class WorkspaceTaskBuildingChecklistView(APIView):
         serializer = WorkspaceTaskChecklistCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.add_workspace_task_checklist_item(employee_id, task_id, serializer.validated_data["title"])
         data.append_workspace_task_audit(
@@ -946,6 +1083,9 @@ class WorkspaceTaskBuildingChecklistItemView(APIView):
         serializer = WorkspaceTaskChecklistPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.patch_workspace_task_checklist_item(employee_id, task_id, item_id, serializer.validated_data)
         data.append_workspace_task_audit(
@@ -961,6 +1101,9 @@ class WorkspaceTaskBuildingChecklistItemView(APIView):
     @extend_schema(operation_id="workspaceTaskBuildingChecklistDelete")
     def delete(self, request, building_id: str, floor_id: str, task_id: str, item_id: str):
         employee_id = _employee_for_building_path(request, building_id, floor_id)
+        require_workspace_task_access(
+            request.user, employee_id, "task.update", task_id=task_id, message="You cannot modify this task."
+        )
         actor_name, actor_role = _workspace_actor(request)
         data.delete_workspace_task_checklist_item(employee_id, task_id, item_id)
         data.append_workspace_task_audit(

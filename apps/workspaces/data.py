@@ -666,6 +666,7 @@ def _grouped_tasks_payload(employee_id: str) -> list[dict]:
 
 def get_employee_workspace(request, viewer_role: str) -> dict:
     from apps.projects import project_documents as project_documents_service
+    from apps.workspaces import documents_service
     from apps.projects.models import ProjectMember
     from apps.storage.warnings import collect_storage_warnings_for_user, storage_backend_hint
 
@@ -724,7 +725,10 @@ def get_employee_workspace(request, viewer_role: str) -> dict:
             "week_balance": {"planned_hours": 40, "logged_hours": 31},
         },
         "tasks_grouped": grouped,
-        "documents": project_documents_service.list_project_documents_for_workspace(request),
+        "documents": [
+            *documents_service.list_workspace_documents(request),
+            *project_documents_service.list_project_documents_for_workspace(request),
+        ],
         "project_context": deepcopy(profile["projects"]),
         "activity_feed": deepcopy(profile["activity_feed"]),
         "ai_context": {

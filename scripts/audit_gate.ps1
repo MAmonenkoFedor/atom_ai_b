@@ -29,6 +29,14 @@ Run-Step -Name "Django checks" -Action {
     & $PythonBin manage.py check
 }
 
+Run-Step -Name "Seed access catalog" -Action {
+    & $PythonBin manage.py seed_access_control
+}
+
+Run-Step -Name "Access privacy defaults check" -Action {
+    & $PythonBin manage.py check_access_privacy_defaults
+}
+
 Run-Step -Name "Alignment schema validate" -Action {
     & $PythonBin manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls
 }

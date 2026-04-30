@@ -8,16 +8,13 @@ from uuid import uuid4
 from django.utils.text import get_valid_filename
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.access.policies import resolve_access
 from apps.projects.models import Project, ProjectDocument, ProjectMember
 from apps.storage.credentials_vault import decrypt_credentials_field
 from apps.storage.enforcement import assert_project_upload_allowed
 from apps.storage.router import get_default_object_storage_provider
 from apps.storage import s3_runtime
-from apps.projects.project_permissions import (
-    PROJECT_SCOPE,
-    can_upload_project_docs,
-    can_view_project_docs,
-)
+from apps.projects.project_permissions import PROJECT_SCOPE
 
 _ALLOWED_DOC_UPLOAD_SUFFIXES = frozenset(
     {
@@ -36,6 +33,12 @@ _ALLOWED_DOC_UPLOAD_SUFFIXES = frozenset(
         ".pptx",
     }
 )
+
+
+def _as_metadata_only(doc: dict) -> dict:
+    row = dict(doc)
+    row["href"] = ""
+    return row
 
 
 def _infer_document_type(filename: str) -> str:
@@ -57,11 +60,25 @@ def _owner_label_for_user(user) -> str:
 
 
 def can_access_project_documents(user, project: Project) -> bool:
-    return can_view_project_docs(user, project)
+    decision = resolve_access(
+        user=user,
+        action="document.read",
+        scope_type="document",
+        scope_id=str(project.id),
+        resource=project,
+    )
+    return decision.allowed
 
 
 def can_manage_project_documents(user, project: Project) -> bool:
-    return can_upload_project_docs(user, project)
+    decision = resolve_access(
+        user=user,
+        action="document.upload",
+        scope_type="document",
+        scope_id=str(project.id),
+        resource=project,
+    )
+    return decision.allowed
 
 
 def list_project_documents_for_workspace(request) -> list[dict]:
@@ -113,18 +130,65 @@ def list_project_documents_for_workspace(request) -> list[dict]:
         .select_related("project")
         .order_by("-updated_at")[:200]
     )
-    return [obj.to_api_dict(request) for obj in qs]
+    rows: list[dict] = []
+    for obj in qs:
+        read_decision = resolve_access(
+            user=request.user,
+            action="document.read",
+            scope_type="document",
+            scope_id=str(obj.project_id),
+            resource=obj.project,
+        )
+        if read_decision.allowed:
+            rows.append(obj.to_api_dict(request))
+            continue
+        metadata_decision = resolve_access(
+            user=request.user,
+            action="document.view_metadata",
+            scope_type="document",
+            scope_id=str(obj.project_id),
+            resource=obj.project,
+        )
+        if metadata_decision.allowed:
+            rows.append(_as_metadata_only(obj.to_api_dict(request)))
+    return rows
 
 
 def list_project_documents(request, project: Project) -> list[dict]:
-    if not can_access_project_documents(request.user, project):
-        raise PermissionDenied("You are not a member of this project.")
+    read_decision = resolve_access(
+        user=request.user,
+        action="document.read",
+        scope_type="document",
+        scope_id=str(project.id),
+        resource=project,
+    )
+    metadata_decision = None
+    if not read_decision.allowed:
+        metadata_decision = resolve_access(
+            user=request.user,
+            action="document.view_metadata",
+            scope_type="document",
+            scope_id=str(project.id),
+            resource=project,
+        )
+        if not metadata_decision.allowed:
+            raise PermissionDenied("You are not a member of this project.")
     qs = ProjectDocument.objects.filter(project=project).select_related("project").order_by("-updated_at")
-    return [obj.to_api_dict(request) for obj in qs]
+    rows = [obj.to_api_dict(request) for obj in qs]
+    if read_decision.allowed:
+        return rows
+    return [_as_metadata_only(row) for row in rows]
 
 
 def create_project_document_link(request, project: Project, title: str, url: str) -> dict:
-    if not can_manage_project_documents(request.user, project):
+    decision = resolve_access(
+        user=request.user,
+        action="document.share",
+        scope_type="document",
+        scope_id=str(project.id),
+        resource=project,
+    )
+    if not decision.allowed:
         raise PermissionDenied("Only project owner or editor can add documents.")
     owner = _owner_label_for_user(request.user)
     obj = ProjectDocument.objects.create(
@@ -140,7 +204,14 @@ def create_project_document_link(request, project: Project, title: str, url: str
 
 
 def create_project_document_upload(request, project: Project, upload) -> dict:
-    if not can_manage_project_documents(request.user, project):
+    decision = resolve_access(
+        user=request.user,
+        action="document.upload",
+        scope_type="document",
+        scope_id=str(project.id),
+        resource=project,
+    )
+    if not decision.allowed:
         raise PermissionDenied("Only project owner or editor can add documents.")
     owner = _owner_label_for_user(request.user)
     name = get_valid_filename(upload.name)

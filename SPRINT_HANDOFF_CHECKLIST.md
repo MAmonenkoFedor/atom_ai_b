@@ -80,6 +80,10 @@ Scope source: `API_BACKEND_PARALLEL_REQUESTS_v2.md`
 - Alignment schema includes auth/workspace/projects/company/super-admin/audit/action/tasks paths.
 - `spectacular --validate --urlconf config.alignment_schema_urls`: errors `0`, warnings `0`.
 - Error contract for frontend-critical paths is DRF style `{ "detail": "..." }`.
+- Access privacy defaults gate:
+  - `python manage.py seed_access_control`
+  - `python manage.py check_access_privacy_defaults`
+  - expected: `company_admin_base` has `ai.workspace.view_metadata` by default and does **not** include `ai.workspace.view_content`.
 
 ## 7) Important Operational Note
 

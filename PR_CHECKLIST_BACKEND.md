@@ -21,6 +21,9 @@
 
 ## 3) Schema и smoke
 
+- [ ] Access privacy defaults green:
+  - `.\.venv\Scripts\python.exe manage.py seed_access_control`
+  - `.\.venv\Scripts\python.exe manage.py check_access_privacy_defaults`
 - [ ] OpenAPI validate зеленый:
   - `.\.venv\Scripts\python.exe manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls`
 - [ ] Прогнан audit gate:
