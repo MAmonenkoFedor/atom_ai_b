@@ -18,6 +18,7 @@ from apps.access.models import (
     PermissionDefinition,
     RoleTemplate,
     RoleTemplatePermission,
+    SCOPE_AI_WORKSPACE,
     SCOPE_COMPANY,
     SCOPE_DEPARTMENT,
     SCOPE_GLOBAL,
@@ -321,6 +322,24 @@ CORE_PERMISSIONS: list[dict] = [
         "is_sensitive": True,
         "description": "Подключение, отключение и настройка LLM-провайдеров.",
     },
+    {
+        "code": "ai.workspace.view_metadata",
+        "name": "Просмотр метаданных AI workspace",
+        "module": PermissionDefinition.MODULE_AI,
+        "allowed_scopes": [SCOPE_COMPANY, SCOPE_AI_WORKSPACE],
+        "can_be_delegated": True,
+        "is_sensitive": False,
+        "description": "Видеть только карточку/метаданные личной AI-зоны сотрудника без контента.",
+    },
+    {
+        "code": "ai.workspace.view_content",
+        "name": "Просмотр контента AI workspace",
+        "module": PermissionDefinition.MODULE_AI,
+        "allowed_scopes": [SCOPE_COMPANY, SCOPE_AI_WORKSPACE],
+        "can_be_delegated": True,
+        "is_sensitive": True,
+        "description": "Доступ к содержимому личной AI-зоны сотрудника (документы, текст, контекст).",
+    },
     # --- Access ------------------------------------------------------------
     {
         "code": "rights.grant",
@@ -422,6 +441,10 @@ CORE_DELEGATION_RULES: list[dict] = [
 
     # AI chat
     {"permission_code": "ai.chat.use", "from_scope_type": SCOPE_COMPANY, "to_scope_type": SCOPE_SELF,
+     "allow_delegate": True, "allow_narrower_scope": True, "max_delegate_depth": 1},
+    {"permission_code": "ai.workspace.view_metadata", "from_scope_type": SCOPE_COMPANY, "to_scope_type": SCOPE_AI_WORKSPACE,
+     "allow_delegate": True, "allow_narrower_scope": True, "max_delegate_depth": 1},
+    {"permission_code": "ai.workspace.view_content", "from_scope_type": SCOPE_COMPANY, "to_scope_type": SCOPE_AI_WORKSPACE,
      "allow_delegate": True, "allow_narrower_scope": True, "max_delegate_depth": 1},
 
     # Rights management — narrowly delegable

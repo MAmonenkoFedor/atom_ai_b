@@ -39,11 +39,14 @@ from rest_framework.views import APIView
 
 from apps.access import resolver, service
 from apps.access.api.serializers import (
+    DenyCreateSerializer,
+    DenyRevokeSerializer,
     DelegationRuleSerializer,
     GrantCreateSerializer,
     GrantRevokeSerializer,
     PermissionAuditLogSerializer,
     PermissionDefinitionSerializer,
+    PermissionDenySerializer,
     PermissionGrantSerializer,
     RoleTemplateAssignmentSerializer,
     RoleTemplatePermissionSerializer,
@@ -55,6 +58,7 @@ from apps.access.models import (
     DelegationRule,
     PermissionAuditLog,
     PermissionDefinition,
+    PermissionDeny,
     PermissionGrant,
     RoleTemplate,
     RoleTemplateAssignment,
@@ -367,6 +371,73 @@ class GrantRevokeView(APIView):
         return Response(PermissionGrantSerializer(grant).data)
 
 
+class DeniesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _ensure_can_manage(request.user, permission_code="docs.view")
+        qs = PermissionDeny.objects.select_related("employee", "denied_by", "revoked_by").all()
+        employee_id = request.query_params.get("employee_id")
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        permission_code = request.query_params.get("permission_code")
+        if permission_code:
+            qs = qs.filter(permission_code=permission_code)
+        scope_type = request.query_params.get("scope_type")
+        if scope_type:
+            qs = qs.filter(scope_type=scope_type)
+        scope_id = request.query_params.get("scope_id")
+        if scope_id is not None:
+            qs = qs.filter(scope_id=scope_id)
+        status_param = request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return Response(_page(request, qs.order_by("-denied_at"), PermissionDenySerializer))
+
+    def post(self, request):
+        payload = DenyCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+
+        employee = get_object_or_404(User, pk=data["employee_id"])
+        _ensure_can_manage(request.user, permission_code=data["permission_code"])
+        try:
+            result = service.deny_permission(
+                employee=employee,
+                permission_code=data["permission_code"],
+                scope_type=data["scope_type"],
+                scope_id=data.get("scope_id", ""),
+                denied_by=request.user,
+                expires_at=data.get("expires_at"),
+                note=data.get("note", ""),
+                source_type=PermissionDeny.SOURCE_MANUAL,
+                request=request,
+            )
+        except service.AccessControlError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            PermissionDenySerializer(result.deny).data, status=status.HTTP_201_CREATED
+        )
+
+
+class DenyRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        deny = get_object_or_404(PermissionDeny, pk=pk)
+        _ensure_can_manage(request.user, permission_code=deny.permission_code)
+        payload = DenyRevokeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        deny = service.revoke_deny(
+            deny,
+            revoked_by=request.user,
+            note=payload.validated_data.get("note", ""),
+            request=request,
+        )
+        return Response(PermissionDenySerializer(deny).data)
+
+
 # ---------------------------------------------------------------------------
 # Employee-scoped endpoints
 # ---------------------------------------------------------------------------
@@ -383,6 +454,19 @@ class EmployeeGrantsView(APIView):
             .order_by("-granted_at")
         )
         return Response(PermissionGrantSerializer(qs, many=True).data)
+
+
+class EmployeeDeniesView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyAdminOrSuperAdmin]
+
+    def get(self, request, employee_id: int):
+        employee = get_object_or_404(User, pk=employee_id)
+        qs = (
+            PermissionDeny.objects.filter(employee=employee)
+            .select_related("denied_by", "revoked_by")
+            .order_by("-denied_at")
+        )
+        return Response(PermissionDenySerializer(qs, many=True).data)
 
 
 class EmployeeEffectivePermissionsView(APIView):

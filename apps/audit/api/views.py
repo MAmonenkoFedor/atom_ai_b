@@ -1,47 +1,24 @@
 import csv
 from collections import defaultdict
-from datetime import datetime, time
 from io import StringIO
 
 from django.db.models import Q
 from django.http import StreamingHttpResponse
-from django.utils import dateparse, timezone
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.models import AuditEvent
+from apps.core.api.datetime_parse import parse_datetime_param
 
 from .serializers import AuditEventSerializer
 
 
 CSV_EXPORT_LIMIT = 50_000
-
-
-def _parse_audit_datetime(raw: str, param_name: str, *, is_end: bool):
-    dt = dateparse.parse_datetime(raw)
-    if dt is not None:
-        if timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone.get_current_timezone())
-        return dt
-
-    d = dateparse.parse_date(raw)
-    if d is not None:
-        boundary_time = time.max if is_end else time.min
-        dt = datetime.combine(d, boundary_time)
-        return timezone.make_aware(dt, timezone.get_current_timezone())
-
-    raise ValidationError(
-        {
-            "detail": (
-                f"Invalid {param_name}. Use ISO datetime "
-                f"(e.g. 2026-04-14T10:00:00+03:00) or date (YYYY-MM-DD)."
-            )
-        }
-    )
 
 
 def _get_role_code(request):
@@ -79,9 +56,9 @@ def _apply_audit_filters(request, qs):
     if chat_id:
         qs = qs.filter(chat_id=chat_id)
     if from_dt:
-        qs = qs.filter(created_at__gte=_parse_audit_datetime(from_dt, "from", is_end=False))
+        qs = qs.filter(created_at__gte=parse_datetime_param(from_dt, "from", is_end=False))
     if to_dt:
-        qs = qs.filter(created_at__lte=_parse_audit_datetime(to_dt, "to", is_end=True))
+        qs = qs.filter(created_at__lte=parse_datetime_param(to_dt, "to", is_end=True))
     if q:
         qs = qs.filter(
             Q(event_type__icontains=q)

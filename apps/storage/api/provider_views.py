@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.service import emit_audit_event
+from apps.core.api.pagination import offset_paginate
 from apps.core.api.permissions import HasCapability, IsSuperAdmin
 from apps.identity.capabilities import STORAGE_PROVIDERS_MANAGE
 from apps.storage.credentials_vault import (
@@ -19,23 +20,6 @@ from apps.storage.credentials_vault import (
 from apps.storage.default_policy import repair_storage_provider_defaults
 from apps.storage.models import StorageProvider
 from apps.storage.s3_probe import probe_s3_compatible_storage
-
-
-def _paginate(queryset, request):
-    try:
-        page = max(1, int(request.query_params.get("page", 1)))
-    except (TypeError, ValueError):
-        page = 1
-    try:
-        page_size = int(request.query_params.get("page_size", 25))
-    except (TypeError, ValueError):
-        page_size = 25
-    page_size = max(1, min(page_size, 100))
-    total = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    items = list(queryset[start:end])
-    return items, page, page_size, total
 
 
 def _clear_other_defaults(exclude_pk: int | None) -> None:
@@ -123,7 +107,7 @@ class SuperAdminStorageProvidersListCreateView(APIView):
             elif val in {"false", "0", "no"}:
                 qs = qs.filter(is_active=False)
 
-        items, page, page_size, total = _paginate(qs, request)
+        items, page, page_size, total = offset_paginate(qs, request)
         return Response(
             {
                 "items": StorageProviderSerializer(items, many=True).data,

@@ -10,28 +10,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.service import emit_audit_event
+from apps.core.api.pagination import offset_paginate
 from apps.core.api.permissions import HasCapability, IsSuperAdmin
 from apps.identity.capabilities import LLM_PROVIDERS_MANAGE
 from apps.llm_gateway.models import LlmModel, LlmProvider
 from apps.llm_gateway.services import LlmGatewayService
-
-
-def _paginate(queryset, request):
-    try:
-        page = max(1, int(request.query_params.get("page", 1)))
-    except (TypeError, ValueError):
-        page = 1
-    try:
-        page_size = int(request.query_params.get("page_size", 25))
-    except (TypeError, ValueError):
-        page_size = 25
-    page_size = max(1, min(page_size, 100))
-
-    total = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    items = list(queryset[start:end])
-    return items, page, page_size, total
 
 
 class LlmProviderSerializer(serializers.ModelSerializer):
@@ -113,7 +96,7 @@ class SuperAdminLlmProvidersListCreateView(APIView):
             elif val in {"false", "0", "no"}:
                 qs = qs.filter(is_active=False)
 
-        items, page, page_size, total = _paginate(qs, request)
+        items, page, page_size, total = offset_paginate(qs, request)
         data = LlmProviderSerializer(items, many=True).data
         return Response({"items": data, "page": page, "page_size": page_size, "total": total})
 

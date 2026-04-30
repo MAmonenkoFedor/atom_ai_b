@@ -5,8 +5,11 @@ from __future__ import annotations
 from django.urls import path
 
 from .views import (
+    DeniesView,
+    DenyRevokeView,
     DelegationRuleDetailView,
     DelegationRulesView,
+    EmployeeDeniesView,
     EmployeeEffectivePermissionsView,
     EmployeeGrantsView,
     EmployeePermissionAuditView,
@@ -44,11 +47,19 @@ urlpatterns = [
     # Grants
     path("grants", GrantsView.as_view(), name="access-grants"),
     path("grants/<int:pk>/revoke", GrantRevokeView.as_view(), name="access-grant-revoke"),
+    # Denies
+    path("denies", DeniesView.as_view(), name="access-denies"),
+    path("denies/<int:pk>/revoke", DenyRevokeView.as_view(), name="access-deny-revoke"),
     # Employee-scoped
     path(
         "employees/<int:employee_id>/grants",
         EmployeeGrantsView.as_view(),
         name="access-employee-grants",
+    ),
+    path(
+        "employees/<int:employee_id>/denies",
+        EmployeeDeniesView.as_view(),
+        name="access-employee-denies",
     ),
     path(
         "employees/<int:employee_id>/effective-permissions",

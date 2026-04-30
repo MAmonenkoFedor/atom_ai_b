@@ -1,0 +1,86 @@
+from django.urls import path
+
+from apps.identity.api.views import (
+    AuthCsrfCookieView,
+    AuthLoginView,
+    AuthLogoutView,
+    AuthSessionView,
+    InviteActivateView,
+)
+from apps.workspaces.api.views import (
+    BuildingDepartmentsView,
+    BuildingDetailView,
+    BuildingsListView,
+    EmployeeMeProfileView,
+    EmployeeProfileByIdView,
+    EmployeeProfileGlobalAliasView,
+    EmployeeProfileView,
+    EmployeeWorkspaceCabinetView,
+    EmployeeWorkspaceContextView,
+    FloorWorkspaceView,
+    WorkspaceContextAliasView,
+    WorkspaceContextGlobalAliasView,
+    WorkspaceQuickTasksView,
+    WorkspaceTaskAliasDetailView,
+    WorkspaceTaskAuditView,
+    WorkspaceTaskBuildingAuditView,
+    WorkspaceTaskBuildingChecklistItemView,
+    WorkspaceTaskBuildingChecklistView,
+    WorkspaceTaskBuildingCommentsView,
+    WorkspaceTaskChecklistItemView,
+    WorkspaceTaskChecklistView,
+    WorkspaceTaskCommentsView,
+    WorkspaceTasksAliasView,
+)
+
+urlpatterns = [
+    path("auth/csrf", AuthCsrfCookieView.as_view()),
+    path("auth/login", AuthLoginView.as_view()),
+    path("auth/logout", AuthLogoutView.as_view()),
+    path("auth/session", AuthSessionView.as_view()),
+    path("auth/invite/activate", InviteActivateView.as_view()),
+    path("buildings", BuildingsListView.as_view()),
+    path("buildings/<str:building_id>", BuildingDetailView.as_view()),
+    path("buildings/<str:building_id>/departments", BuildingDepartmentsView.as_view()),
+    path("buildings/<str:building_id>/floors/<str:floor_id>/workspace", FloorWorkspaceView.as_view()),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/workspace/employee/<str:employee_id>",
+        EmployeeWorkspaceContextView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/employees/<str:employee_id>/profile",
+        EmployeeProfileView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/audit",
+        WorkspaceTaskBuildingAuditView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/comments",
+        WorkspaceTaskBuildingCommentsView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist",
+        WorkspaceTaskBuildingChecklistView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/tasks/<str:task_id>/checklist/<str:item_id>",
+        WorkspaceTaskBuildingChecklistItemView.as_view(),
+    ),
+    path(
+        "buildings/<str:building_id>/floors/<str:floor_id>/workspace-context",
+        WorkspaceContextAliasView.as_view(),
+    ),
+    path("workspace/context", WorkspaceContextGlobalAliasView.as_view()),
+    path("employees/<str:employee_id>/profile", EmployeeProfileGlobalAliasView.as_view()),
+    path("workspace", EmployeeWorkspaceCabinetView.as_view()),
+    path("workspace/tasks", WorkspaceTasksAliasView.as_view()),
+    path("workspace/tasks/<str:task_id>/audit", WorkspaceTaskAuditView.as_view()),
+    path("workspace/tasks/<str:task_id>/comments", WorkspaceTaskCommentsView.as_view()),
+    path("workspace/tasks/<str:task_id>/checklist", WorkspaceTaskChecklistView.as_view()),
+    path("workspace/tasks/<str:task_id>/checklist/<str:item_id>", WorkspaceTaskChecklistItemView.as_view()),
+    path("workspace/tasks/<str:task_id>", WorkspaceTaskAliasDetailView.as_view()),
+    path("employees/me", EmployeeMeProfileView.as_view()),
+    path("employees/<str:employee_id>", EmployeeProfileByIdView.as_view()),
+    path("workspace/quick-tasks", WorkspaceQuickTasksView.as_view()),
+]

@@ -1,11 +1,16 @@
 param(
-    [string]$BaseUrl = "http://127.0.0.1:8000/api",
+    [string]$BaseUrl = "http://127.0.0.1:8765/api",
     [ValidateSet("Fast", "Full")]
     [string]$Mode = "Full",
     [string]$SmokeJsonReportPath = ".\smoke_report.json"
 )
 
 $ErrorActionPreference = "Stop"
+$PythonBin = ".\.venv\Scripts\python.exe"
+
+if (-not (Test-Path $PythonBin)) {
+    throw "Python virtual environment not found at $PythonBin. Create/activate .venv before running audit_gate.ps1."
+}
 
 function Run-Step {
     param(
@@ -21,11 +26,11 @@ function Run-Step {
 }
 
 Run-Step -Name "Django checks" -Action {
-    .\.venv\Scripts\python.exe manage.py check
+    & $PythonBin manage.py check
 }
 
 Run-Step -Name "Alignment schema validate" -Action {
-    .\.venv\Scripts\python.exe manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls
+    & $PythonBin manage.py spectacular --validate --file alignment_openapi.yaml --urlconf config.alignment_schema_urls
 }
 
 Run-Step -Name "Smoke runner" -Action {

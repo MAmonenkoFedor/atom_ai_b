@@ -1,8 +1,5 @@
-from datetime import datetime, time
-
 from django.conf import settings
 from django.core.cache import cache
-from django.utils import dateparse
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError, PermissionDenied
@@ -11,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.audit.service import emit_audit_event
+from apps.core.api.datetime_parse import parse_datetime_param
 from apps.ai.models import AiRun, PersonalAIPreference
 from apps.chats.models import Chat, ChatAttachment, Message
 from apps.llm_gateway.models import LlmRequestLog
@@ -20,6 +18,7 @@ from apps.orgstructure.models import OrgUnit
 from apps.projects.models import Project, ProjectDocument, ProjectMember
 from apps.workspaces.models import WorkspaceCabinetDocument
 from apps.workspaces import data as workspace_data
+from apps.access.policies import resolve_ai_workspace_access
 
 from .serializers import (
     AiChatAllowedModelSerializer,
@@ -437,11 +436,11 @@ class AiRunLogsView(generics.ListAPIView):
             qs = qs.filter(latency_ms__gte=min_latency)
 
         if from_param:
-            from_dt = self._parse_datetime_param(from_param, "from", is_end=False)
+            from_dt = parse_datetime_param(from_param, "from", is_end=False)
             qs = qs.filter(created_at__gte=from_dt)
 
         if to_param:
-            to_dt = self._parse_datetime_param(to_param, "to", is_end=True)
+            to_dt = parse_datetime_param(to_param, "to", is_end=True)
             qs = qs.filter(created_at__lte=to_dt)
 
         allowed_sort = {
@@ -470,30 +469,6 @@ class AiRunLogsView(generics.ListAPIView):
 
         return qs
 
-    @staticmethod
-    def _parse_datetime_param(raw: str, param_name: str, *, is_end: bool):
-        dt = dateparse.parse_datetime(raw)
-        if dt is not None:
-            if timezone.is_naive(dt):
-                dt = timezone.make_aware(dt, timezone.get_current_timezone())
-            return dt
-
-        d = dateparse.parse_date(raw)
-        if d is not None:
-            boundary_time = time.max if is_end else time.min
-            dt = datetime.combine(d, boundary_time)
-            return timezone.make_aware(dt, timezone.get_current_timezone())
-
-        raise ValidationError(
-            {
-                "detail": (
-                    f"Invalid {param_name}. Use ISO datetime "
-                    f"(e.g. 2026-04-14T10:00:00+03:00) or date (YYYY-MM-DD)."
-                )
-            }
-        )
-
-
 class AiChatCompletionsView(APIView):
     permission_classes = [IsAuthenticated]
     provider = OpenRouterProvider()
@@ -504,9 +479,12 @@ class AiChatCompletionsView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        self._enforce_rate_limits(request, data["thread_id"])
-
         chat = generics.get_object_or_404(Chat.objects.select_related("project"), pk=data["thread_id"])
+        self._enforce_rate_limits(
+            request,
+            data["thread_id"],
+            organization_id=chat.project.organization_id if chat.project_id else None,
+        )
         if not self._can_access_chat(request.user, chat):
             raise PermissionDenied("You do not have access to this thread.")
         emit_audit_event(
@@ -734,6 +712,63 @@ class AiChatCompletionsView(APIView):
                 )
             wdoc = WorkspaceCabinetDocument.objects.filter(pk=doc_id).first()
             if wdoc:
+                owner_user_id = int(wdoc.user_id)
+                requester_user_id = int(request.user.id)
+                if owner_user_id != requester_user_id:
+                    decision = resolve_ai_workspace_access(
+                        viewer=request.user,
+                        owner_user_id=owner_user_id,
+                    )
+                    if not decision.can_view_content and not decision.can_view_metadata:
+                        emit_audit_event(
+                            request,
+                            event_type="ai.workspace_content_access_denied",
+                            entity_type="workspace_document",
+                            action="deny",
+                            entity_id=str(wdoc.pk),
+                            payload={
+                                "owner_user_id": owner_user_id,
+                                "requester_user_id": requester_user_id,
+                                "reason": decision.reason,
+                                "mode": "document_context",
+                            },
+                        )
+                        raise PermissionDenied("Недостаточно прав для доступа к личной AI-зоне сотрудника.")
+
+                    if decision.can_view_content:
+                        emit_audit_event(
+                            request,
+                            event_type="ai.workspace_content_accessed",
+                            entity_type="workspace_document",
+                            action="view_content",
+                            entity_id=str(wdoc.pk),
+                            payload={
+                                "owner_user_id": owner_user_id,
+                                "requester_user_id": requester_user_id,
+                                "reason": decision.reason,
+                                "mode": "document_context",
+                            },
+                        )
+                    else:
+                        emit_audit_event(
+                            request,
+                            event_type="ai.workspace_metadata_accessed",
+                            entity_type="workspace_document",
+                            action="view_metadata",
+                            entity_id=str(wdoc.pk),
+                            payload={
+                                "owner_user_id": owner_user_id,
+                                "requester_user_id": requester_user_id,
+                                "reason": decision.reason,
+                                "mode": "document_context",
+                            },
+                        )
+                        return (
+                            f"Workspace document metadata:\n"
+                            f"id=doc-{wdoc.pk}\nowner_user_id={wdoc.user_id}\n"
+                            f"type={wdoc.document_type}\n"
+                            "title=(hidden: requires ai.workspace.view_content)"
+                        )
                 return (
                     f"Workspace document context:\n"
                     f"id=doc-{wdoc.pk}\nowner_user_id={wdoc.user_id}\n"
@@ -761,7 +796,7 @@ class AiChatCompletionsView(APIView):
             )
         raise ValidationError({"context_type": f"Unsupported context_type '{context_type}'."})
 
-    def _enforce_rate_limits(self, request, thread_id: int):
+    def _enforce_rate_limits(self, request, thread_id: int, *, organization_id: int | None = None):
         user_limit = int(settings.AI_CHAT_RATE_LIMIT_USER_PER_MINUTE)
         org_limit = int(settings.AI_CHAT_RATE_LIMIT_COMPANY_PER_MINUTE)
         user_key = f"ai_chat_rl_user:{request.user.id}:{timezone.now().strftime('%Y%m%d%H%M')}"
@@ -776,7 +811,9 @@ class AiChatCompletionsView(APIView):
                 payload={"scope": "user", "limit": user_limit},
             )
             raise ValidationError({"detail": "Rate limit exceeded for user."})
-        org_id = self._resolve_org_id(request.user, thread_id)
+        org_id = organization_id
+        if org_id is None:
+            org_id = self._resolve_org_id(request.user)
         if org_id:
             org_key = f"ai_chat_rl_org:{org_id}:{timezone.now().strftime('%Y%m%d%H%M')}"
             if self._increment_rate(org_key) > org_limit:
@@ -803,12 +840,7 @@ class AiChatCompletionsView(APIView):
             return 1
 
     @staticmethod
-    def _resolve_org_id(user, thread_id: int) -> int | None:
-        org_id = (
-            Chat.objects.filter(pk=thread_id).values_list("project__organization_id", flat=True).first()
-        )
-        if org_id:
-            return int(org_id)
+    def _resolve_org_id(user) -> int | None:
         membership = (
             OrganizationMember.objects.filter(user_id=user.id, is_active=True)
             .values_list("organization_id", flat=True)

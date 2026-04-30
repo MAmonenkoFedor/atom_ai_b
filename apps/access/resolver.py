@@ -20,6 +20,7 @@ from django.utils import timezone
 from apps.access.models import (
     DelegationRule,
     PermissionDefinition,
+    PermissionDeny,
     PermissionGrant,
     RoleTemplateAssignment,
     RoleTemplatePermission,
@@ -125,6 +126,22 @@ def _fresh_grants_qs(user):
 
     return PermissionGrant.objects.filter(
         employee=user, status=PermissionGrant.STATUS_ACTIVE
+    )
+
+
+def _fresh_denies_qs(user):
+    now = _now()
+    stale = PermissionDeny.objects.filter(
+        employee=user,
+        status=PermissionDeny.STATUS_ACTIVE,
+        expires_at__isnull=False,
+        expires_at__lt=now,
+    )
+    if stale.exists():
+        stale.update(status=PermissionDeny.STATUS_EXPIRED)
+
+    return PermissionDeny.objects.filter(
+        employee=user, status=PermissionDeny.STATUS_ACTIVE
     )
 
 
@@ -246,6 +263,16 @@ def has_permission(
     ).first()
     if definition is None:
         return False
+
+    active_denies = _fresh_denies_qs(user).filter(permission_code=permission_code)
+    for deny in active_denies:
+        if scope_covers(
+            grant_scope_type=deny.scope_type,
+            grant_scope_id=deny.scope_id,
+            required_scope_type=scope_type,
+            required_scope_id=scope_id,
+        ):
+            return False
 
     for row in _template_grants_for(user):
         if row.permission_code != permission_code:

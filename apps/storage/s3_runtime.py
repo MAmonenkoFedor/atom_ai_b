@@ -52,6 +52,44 @@ def put_object_bytes(
     client.put_object(Bucket=provider.bucket, Key=object_key, Body=body, **extra)
 
 
+class _CountingReader:
+    def __init__(self, fileobj, max_bytes: int | None = None):
+        self._fileobj = fileobj
+        self._max_bytes = max_bytes
+        self.bytes_read = 0
+
+    def read(self, size: int = -1):
+        chunk = self._fileobj.read(size)
+        if not chunk:
+            return chunk
+        self.bytes_read += len(chunk)
+        if self._max_bytes is not None and self.bytes_read > self._max_bytes:
+            raise ValueError("File too large (max 15MB).")
+        return chunk
+
+
+def put_object_fileobj(
+    provider: "StorageProvider",
+    *,
+    access_key: str,
+    secret_key: str,
+    object_key: str,
+    fileobj,
+    content_type: str | None = None,
+    max_bytes: int | None = None,
+) -> int:
+    client = _client_for(provider, access_key, secret_key)
+    ct = content_type or mimetypes.guess_type(object_key)[0] or "application/octet-stream"
+    wrapped = _CountingReader(fileobj, max_bytes=max_bytes)
+    client.upload_fileobj(
+        Fileobj=wrapped,
+        Bucket=provider.bucket,
+        Key=object_key,
+        ExtraArgs={"ContentType": ct},
+    )
+    return wrapped.bytes_read
+
+
 def presigned_get_url(
     provider: "StorageProvider",
     *,

@@ -73,7 +73,7 @@ def _owner_label(employee_id: str) -> str:
     return str(header.get("full_name") or "Employee")
 
 
-def _seed_defaults_for_user(user, employee_id: str) -> None:
+def _seed_defaults_for_user(user, employee_id: str) -> list[WorkspaceCabinetDocument]:
     owner = _owner_label(employee_id)
     rows = [
         WorkspaceCabinetDocument(
@@ -86,7 +86,7 @@ def _seed_defaults_for_user(user, employee_id: str) -> None:
         )
         for row in _SEED_TEMPLATE
     ]
-    WorkspaceCabinetDocument.objects.bulk_create(rows)
+    return WorkspaceCabinetDocument.objects.bulk_create(rows)
 
 
 def list_workspace_documents(request) -> list[dict]:
@@ -95,10 +95,10 @@ def list_workspace_documents(request) -> list[dict]:
     user = request.user
     employee_id = workspace_data.resolve_employee_id_for_username(user.username)
     qs = WorkspaceCabinetDocument.objects.filter(user=user).order_by("-updated_at")
-    if not qs.exists():
-        _seed_defaults_for_user(user, employee_id)
-        qs = WorkspaceCabinetDocument.objects.filter(user=user).order_by("-updated_at")
-    return [obj.to_api_dict(request) for obj in qs]
+    rows = list(qs)
+    if not rows:
+        rows = _seed_defaults_for_user(user, employee_id)
+    return [obj.to_api_dict(request) for obj in rows]
 
 
 def create_workspace_document_link(request, title: str, url: str) -> dict:
@@ -138,20 +138,20 @@ def create_workspace_document_upload(request, upload) -> dict:
     provider = get_default_object_storage_provider()
     if provider:
         object_key = f"workspace_cabinet/{user.id}/{uuid4().hex[:10]}_{name}"
-        try:
-            body = upload.read()
-        except Exception as exc:
-            raise ValidationError({"file": "Не удалось прочитать файл для загрузки."}) from exc
-        if len(body) > 15 * 1024 * 1024:
-            raise ValidationError({"file": "File too large (max 15MB)."})
+        content_type = getattr(upload, "content_type", None) or None
         creds = decrypt_credentials_field(provider.credentials)
         try:
-            s3_runtime.put_object_bytes(
+            fileobj = getattr(upload, "file", upload)
+            if hasattr(fileobj, "seek"):
+                fileobj.seek(0)
+            uploaded_bytes = s3_runtime.put_object_fileobj(
                 provider,
                 access_key=creds["access_key"],
                 secret_key=creds["secret_key"],
                 object_key=object_key,
-                body=body,
+                fileobj=fileobj,
+                content_type=content_type,
+                max_bytes=15 * 1024 * 1024,
             )
         except Exception as exc:
             raise ValidationError(
@@ -165,7 +165,7 @@ def create_workspace_document_upload(request, upload) -> dict:
             owner_label=owner,
             storage_provider=provider,
             storage_object_key=object_key,
-            upload_stored_bytes=len(body),
+            upload_stored_bytes=int(uploaded_bytes),
         )
         return obj.to_api_dict(request)
 

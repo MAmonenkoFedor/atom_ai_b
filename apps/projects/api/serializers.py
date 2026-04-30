@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -130,21 +132,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         docs = getattr(obj, "_documents_total", _MISSING)
         chats = getattr(obj, "_chats_total", _MISSING)
-        if docs is not _MISSING and chats is not _MISSING:
-            return {
-                "tasks_total": tasks_total,
-                "tasks_open": tasks_open,
-                "documents_total": int(docs),
-                "chat_threads_total": int(chats),
-            }
-        from apps.chats.models import Chat
-        from apps.projects.models import ProjectDocument
-
         return {
             "tasks_total": tasks_total,
             "tasks_open": tasks_open,
-            "documents_total": ProjectDocument.objects.filter(project=obj).count(),
-            "chat_threads_total": Chat.objects.filter(project=obj).count(),
+            "documents_total": int(docs) if docs is not _MISSING else 0,
+            "chat_threads_total": int(chats) if chats is not _MISSING else 0,
         }
 
     def get_my_project_role(self, obj: Project) -> str | None:
@@ -203,7 +195,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             return raw.get(obj.pk) or {}
         return {}
 
-    def get_project_lead_id(self, obj: Project):
+    def get_project_lead_id(self, obj: Project) -> str:
         return self._lead_payload(obj).get("project_lead_id")
 
     def get_project_lead(self, obj: Project) -> str:
@@ -212,10 +204,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_project_lead_email(self, obj: Project) -> str:
         return self._lead_payload(obj).get("project_lead_email") or ""
 
-    def get_lead_bundle_permissions(self, obj: Project) -> list:
+    def get_lead_bundle_permissions(self, obj: Project) -> list[str]:
         return self._lead_payload(obj).get("lead_bundle_permissions") or []
 
-    def get_lead_history(self, obj: Project) -> list:
+    def get_lead_history(self, obj: Project) -> list[dict[str, Any]]:
         return self._lead_payload(obj).get("lead_history") or []
 
 

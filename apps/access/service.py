@@ -27,6 +27,7 @@ from apps.access import resolver
 from apps.access.models import (
     DelegationRule,
     PermissionAuditLog,
+    PermissionDeny,
     PermissionDefinition,
     PermissionGrant,
     RoleTemplate,
@@ -293,6 +294,12 @@ class GrantPermissionResult:
     audit: PermissionAuditLog
 
 
+@dataclass
+class DenyPermissionResult:
+    deny: PermissionDeny
+    audit: PermissionAuditLog
+
+
 def grant_permission(
     *,
     employee,
@@ -524,6 +531,86 @@ def revoke_permission(
         note=note,
     )
     return grant
+
+
+@transaction.atomic
+def deny_permission(
+    *,
+    employee,
+    permission_code: str,
+    scope_type: str = SCOPE_GLOBAL,
+    scope_id: str = "",
+    denied_by=None,
+    expires_at=None,
+    note: str = "",
+    source_type: str = PermissionDeny.SOURCE_MANUAL,
+    source_id: str = "",
+    request=None,
+) -> DenyPermissionResult:
+    definition = _definition_or_fail(permission_code)
+    _assert_scope_allowed(definition, scope_type)
+
+    if source_type == PermissionDeny.SOURCE_MANUAL and denied_by is None:
+        raise AccessControlError("Manual denies require a non-null denied_by")
+
+    deny = PermissionDeny.objects.create(
+        employee=employee,
+        permission_code=permission_code,
+        scope_type=scope_type,
+        scope_id=scope_id or "",
+        denied_by=denied_by,
+        expires_at=expires_at,
+        note=note or "",
+        source_type=source_type,
+        source_id=source_id or "",
+    )
+    audit = _record_audit(
+        request=request,
+        actor=denied_by,
+        target=employee,
+        action=PermissionAuditLog.ACTION_DENY_CREATED,
+        permission_code=permission_code,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        new_value={
+            "deny_id": deny.id,
+            "expires_at": deny.expires_at.isoformat() if deny.expires_at else None,
+            "source_type": source_type,
+        },
+        note=note,
+    )
+    return DenyPermissionResult(deny=deny, audit=audit)
+
+
+@transaction.atomic
+def revoke_deny(
+    deny: PermissionDeny,
+    *,
+    revoked_by=None,
+    note: str = "",
+    request=None,
+) -> PermissionDeny:
+    if deny.status == PermissionDeny.STATUS_REVOKED:
+        return deny
+    old = {"status": deny.status}
+    deny.status = PermissionDeny.STATUS_REVOKED
+    deny.revoked_at = timezone.now()
+    deny.revoked_by = revoked_by
+    deny.save(update_fields=["status", "revoked_at", "revoked_by"])
+
+    _record_audit(
+        request=request,
+        actor=revoked_by,
+        target=deny.employee,
+        action=PermissionAuditLog.ACTION_DENY_REVOKED,
+        permission_code=deny.permission_code,
+        scope_type=deny.scope_type,
+        scope_id=deny.scope_id,
+        old_value=old,
+        new_value={"status": deny.status},
+        note=note,
+    )
+    return deny
 
 
 def _assert_delegation_allowed(
@@ -772,9 +859,12 @@ __all__ = (
     "DelegationNotAllowed",
     "DELEGATION_BLOCK_REASONS",
     "GrantPermissionResult",
+    "DenyPermissionResult",
     "AssignTemplateResult",
     "grant_permission",
     "revoke_permission",
+    "deny_permission",
+    "revoke_deny",
     "assign_role_template",
     "remove_role_template",
     "has_permission",

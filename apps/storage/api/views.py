@@ -8,29 +8,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.service import emit_audit_event
+from apps.core.api.pagination import offset_paginate
 from apps.core.api.permissions import HasCapability, IsSuperAdmin, user_has_capability
 from apps.identity.capabilities import STORAGE_QUOTAS_MANAGE, STORAGE_USAGE_VIEW_ALL
 from apps.storage.models import StorageQuota
 from apps.storage.quota_labels import build_storage_quota_source_label
 from apps.storage.quota_usage import usage_bytes_for_quota
 from apps.storage.service import compute_storage_usage
-
-
-def _paginate(queryset, request):
-    try:
-        page = max(1, int(request.query_params.get("page", 1)))
-    except (TypeError, ValueError):
-        page = 1
-    try:
-        page_size = int(request.query_params.get("page_size", 25))
-    except (TypeError, ValueError):
-        page_size = 25
-    page_size = max(1, min(page_size, 100))
-    total = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    items = list(queryset[start:end])
-    return items, page, page_size, total
 
 
 def _can_read_usage(user) -> bool:
@@ -159,7 +143,7 @@ class StorageQuotaListCreateView(APIView):
         scope = (request.query_params.get("scope") or "").strip()
         if scope:
             qs = qs.filter(scope=scope)
-        items, page, page_size, total = _paginate(qs, request)
+        items, page, page_size, total = offset_paginate(qs, request)
         usage = compute_storage_usage()
         incoming = _incoming_bytes_from_request(request)
         ctx = {"usage": usage, "incoming_bytes": incoming}

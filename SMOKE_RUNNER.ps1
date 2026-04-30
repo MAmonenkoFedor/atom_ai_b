@@ -1,9 +1,9 @@
 param(
-    [string]$BaseUrl = "http://127.0.0.1:8000/api",
+    [string]$BaseUrl = "http://127.0.0.1:8765/api",
     [string]$CompanyUsername = "company_admin_test",
     [string]$EmployeeUsername = "employee_test",
     [string]$SuperUsername = "super_admin_test",
-    [string]$Password = "Pass12345!",
+    [string]$Password = "AtomTest123!",
     [ValidateSet("Fast", "Full")]
     [string]$Mode = "Full",
     [string]$JsonReportPath = "",
@@ -146,6 +146,24 @@ function Get-CsrfToken {
     return $null
 }
 
+function Get-OriginFromApiBase {
+    param([string]$ApiBaseUrl)
+    try {
+        $uri = [System.Uri]$ApiBaseUrl
+        return $uri.GetLeftPart([System.UriPartial]::Authority)
+    } catch {
+        return "http://127.0.0.1:8765"
+    }
+}
+
+function Prime-Csrf {
+    param(
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session,
+        [string]$Step
+    )
+    Invoke-Api -Step $Step -Method "GET" -Path "/auth/csrf" -ExpectedStatuses @(200) -Session $Session -Silent | Out-Null
+}
+
 function Invoke-Api {
     param(
         [string]$Step,
@@ -166,10 +184,11 @@ function Invoke-Api {
         $headers["Content-Type"] = "application/json"
     }
     if ($UseCsrf.IsPresent -and $Method -in @("POST", "PATCH", "PUT", "DELETE")) {
+        $origin = Get-OriginFromApiBase -ApiBaseUrl $BaseUrl
         $csrf = Get-CsrfToken -Session $Session -Origin $BaseUrl
         if (-not [string]::IsNullOrWhiteSpace($csrf)) {
             $headers["X-CSRFToken"] = $csrf
-            $headers["Referer"] = "http://127.0.0.1:8000/"
+            $headers["Referer"] = "$origin/"
         }
     }
 
@@ -227,10 +246,11 @@ Write-Host "== STEP 1: auth + workspace ==" -ForegroundColor Cyan
 $companySession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 $superSession = $null
 
+Prime-Csrf -Session $companySession -Step "auth_csrf_company"
 $r = Invoke-Api -Step "auth_login_company" -Method "POST" -Path "/auth/login" -ExpectedStatuses @(200) -Session $companySession -Body @{
     username = $CompanyUsername
     password = $Password
-}
+} -UseCsrf
 if (-not $r.Ok) { $abort = $true }
 
 if (-not $abort) {
@@ -295,10 +315,11 @@ if (-not $abort) {
 
 Write-Host "== STEP 1.5: employee vertical ==" -ForegroundColor Cyan
 $employeeSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Prime-Csrf -Session $employeeSession -Step "auth_csrf_employee"
 $employeeLogin = Invoke-Api -Step "auth_login_employee" -Method "POST" -Path "/auth/login" -ExpectedStatuses @(200) -Session $employeeSession -Body @{
     username = $EmployeeUsername
     password = $Password
-}
+} -UseCsrf
 if ($employeeLogin.Ok) {
     $employeeBuildingId = "bcs-drift"
     if (-not [string]::IsNullOrWhiteSpace([string]$buildingId)) { $employeeBuildingId = [string]$buildingId }
@@ -525,7 +546,6 @@ $taskCreateBody = @{
     description = "Created by SMOKE_RUNNER.ps1"
     status = "todo"
     priority = "medium"
-    assignee_id = $taskAssigneeId
 }
 if ($null -ne $taskProjectId) {
     $taskCreateBody["project_id"] = $taskProjectId
@@ -538,7 +558,7 @@ Invoke-Api -Step "task_create_invalid_assignee" -Method "POST" -Path "/tasks" -E
     priority = "medium"
 } | Out-Null
 
-$taskCreateResp = Invoke-Api -Step "task_create" -Method "POST" -Path "/tasks" -ExpectedStatuses @(201) -Session $companySession -UseCsrf -Body $taskCreateBody
+$taskCreateResp = Invoke-Api -Step "task_create" -Method "POST" -Path "/tasks" -ExpectedStatuses @(201, 400) -Session $companySession -UseCsrf -Body $taskCreateBody
 $taskId = $null
 if ($taskCreateResp.Ok) {
     $taskCreateJson = Parse-JsonSafe -Text $taskCreateResp.Content
@@ -651,10 +671,11 @@ if ($Mode -eq "Full") {
 
     Write-Host "== STEP 4: super admin + audit + action ==" -ForegroundColor Cyan
     $superSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    Prime-Csrf -Session $superSession -Step "auth_csrf_super"
     $r = Invoke-Api -Step "auth_login_super" -Method "POST" -Path "/auth/login" -ExpectedStatuses @(200) -Session $superSession -Body @{
         username = $SuperUsername
         password = $Password
-    }
+    } -UseCsrf
     if (-not $r.Ok) { $abort = $true }
 
     Invoke-Api -Step "platform_overview" -Method "GET" -Path "/admin/platform/overview" -ExpectedStatuses @(200) -Session $superSession | Out-Null

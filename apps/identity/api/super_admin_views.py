@@ -14,12 +14,12 @@ from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import serializers, status
-from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.service import emit_audit_event
+from apps.core.api.pagination import offset_paginate
 from apps.core.api.permissions import (
     HasCapability,
     IsSuperAdmin,
@@ -27,7 +27,6 @@ from apps.core.api.permissions import (
 )
 from apps.identity.capabilities import (
     ALL_CAPABILITIES,
-    AUDIT_VIEW_ALL,
     CAPABILITIES_MANAGE,
     ROLES_MANAGE,
     USERS_DISABLE,
@@ -244,24 +243,6 @@ def _resolve_scope_organization_id(scope: str) -> str | None:
     return None
 
 
-def _paginate(queryset, request):
-    try:
-        page = max(1, int(request.query_params.get("page", 1)))
-    except (TypeError, ValueError):
-        page = 1
-    try:
-        page_size = int(request.query_params.get("page_size", 25))
-    except (TypeError, ValueError):
-        page_size = 25
-    page_size = max(1, min(page_size, 100))
-
-    total = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    items = list(queryset[start:end])
-    return items, page, page_size, total
-
-
 # ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
@@ -313,7 +294,7 @@ class PlatformUsersListView(APIView):
         if org_id:
             qs = qs.filter(role_assignments__organization_id=org_id).distinct()
 
-        items, page, page_size, total = _paginate(qs, request)
+        items, page, page_size, total = offset_paginate(qs, request)
         data = PlatformUserSerializer(items, many=True).data
         return Response(
             {
@@ -388,6 +369,9 @@ class InviteUserView(APIView):
                 if mapped:
                     normalized_role_codes.append(mapped)
             normalized_role_codes = list(dict.fromkeys(normalized_role_codes))
+            role_map = {
+                role.code: role for role in Role.objects.filter(code__in=normalized_role_codes)
+            }
 
             parsed_org_ids: list[int] = []
             for raw in payload.get("org_ids", []) or []:
@@ -413,14 +397,14 @@ class InviteUserView(APIView):
                         membership.save(update_fields=["is_active"])
 
                 for role_code in normalized_role_codes:
-                    role = Role.objects.filter(code=role_code).first()
+                    role = role_map.get(role_code)
                     if not role:
                         continue
                     for org in organizations:
                         UserRole.objects.get_or_create(user=user, role=role, organization=org)
             else:
                 for role_code in normalized_role_codes:
-                    role = Role.objects.filter(code=role_code).first()
+                    role = role_map.get(role_code)
                     if role:
                         UserRole.objects.get_or_create(user=user, role=role, organization=None)
 
@@ -639,8 +623,8 @@ class UpdateUserRolesView(APIView):
             )
 
         organization_id = _resolve_scope_organization_id(scope)
-
-        unknown = [code for code in roles if not Role.objects.filter(code=code).exists()]
+        role_map = {role.code: role for role in Role.objects.filter(code__in=roles)}
+        unknown = [code for code in roles if code not in role_map]
         if unknown:
             return Response(
                 {
@@ -660,7 +644,7 @@ class UpdateUserRolesView(APIView):
             current_qs.delete()
 
             for code in roles:
-                role = Role.objects.get(code=code)
+                role = role_map[code]
                 UserRole.objects.create(
                     user=user,
                     role=role,

@@ -8,6 +8,7 @@ from apps.access.models import (
     DelegationRule,
     PermissionAuditLog,
     PermissionDefinition,
+    PermissionDeny,
     PermissionGrant,
     RoleTemplate,
     RoleTemplateAssignment,
@@ -152,6 +153,51 @@ class PermissionGrantSerializer(serializers.ModelSerializer):
         actor = obj.granted_by
         return getattr(actor, "email", None) if actor else None
 
+
+class PermissionDenySerializer(serializers.ModelSerializer):
+    denied_by_email = serializers.SerializerMethodField()
+    revoked_by_email = serializers.SerializerMethodField()
+    employee_email = serializers.CharField(source="employee.email", read_only=True)
+
+    class Meta:
+        model = PermissionDeny
+        fields = (
+            "id",
+            "employee",
+            "employee_email",
+            "permission_code",
+            "scope_type",
+            "scope_id",
+            "denied_by",
+            "denied_by_email",
+            "denied_at",
+            "expires_at",
+            "revoked_at",
+            "revoked_by",
+            "revoked_by_email",
+            "status",
+            "note",
+            "source_type",
+            "source_id",
+        )
+        read_only_fields = (
+            "denied_at",
+            "revoked_at",
+            "status",
+            "denied_by",
+            "revoked_by",
+        )
+
+    @staticmethod
+    def get_denied_by_email(obj: PermissionDeny) -> str | None:
+        actor = obj.denied_by
+        return getattr(actor, "email", None) if actor else None
+
+    @staticmethod
+    def get_revoked_by_email(obj: PermissionDeny) -> str | None:
+        actor = obj.revoked_by
+        return getattr(actor, "email", None) if actor else None
+
     @staticmethod
     def get_revoked_by_email(obj: PermissionGrant) -> str | None:
         actor = obj.revoked_by
@@ -240,6 +286,19 @@ class GrantCreateSerializer(serializers.Serializer):
 
 
 class GrantRevokeSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class DenyCreateSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    permission_code = serializers.CharField(max_length=128)
+    scope_type = serializers.CharField(max_length=32)
+    scope_id = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    expires_at = serializers.DateTimeField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class DenyRevokeSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True)
 
 

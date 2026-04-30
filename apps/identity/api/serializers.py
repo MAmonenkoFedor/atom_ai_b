@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -160,7 +162,7 @@ class SessionUserSerializer(serializers.ModelSerializer):
             return m.org_unit.name
         return ""
 
-    def get_department_id(self, obj):
+    def get_department_id(self, obj) -> int | None:
         m = self._org_unit_membership(obj)
         return m.org_unit_id if m else None
 
@@ -180,24 +182,27 @@ class SessionUserSerializer(serializers.ModelSerializer):
         m = self._org_unit_membership(obj)
         return bool(m and m.is_lead)
 
+    def _manager_link(self, obj):
+        if not hasattr(self, "_cached_manager_link"):
+            om = self._organization_member(obj)
+            if not om:
+                self._cached_manager_link = None
+            else:
+                self._cached_manager_link = (
+                    UserManagerLink.objects.filter(employee=obj, organization=om.organization)
+                    .select_related("manager")
+                    .first()
+                )
+        return self._cached_manager_link
+
     def get_manager_name(self, obj) -> str:
-        om = self._organization_member(obj)
-        if not om:
-            return ""
-        link = (
-            UserManagerLink.objects.filter(employee=obj, organization=om.organization)
-            .select_related("manager")
-            .first()
-        )
+        link = self._manager_link(obj)
         if not link or not link.manager:
             return ""
         return (link.manager.get_full_name() or link.manager.username or "").strip()
 
-    def get_manager_id(self, obj):
-        om = self._organization_member(obj)
-        if not om:
-            return None
-        link = UserManagerLink.objects.filter(employee=obj, organization=om.organization).first()
+    def get_manager_id(self, obj) -> int | None:
+        link = self._manager_link(obj)
         return link.manager_id if link else None
 
     def _project_memberships(self, obj):
@@ -209,7 +214,7 @@ class SessionUserSerializer(serializers.ModelSerializer):
             )
         return self._cached_project_memberships
 
-    def get_project_leads(self, obj):
+    def get_project_leads(self, obj) -> list[dict[str, Any]]:
         leads = [
             m
             for m in self._project_memberships(obj)
@@ -224,7 +229,7 @@ class SessionUserSerializer(serializers.ModelSerializer):
             for m in leads
         ]
 
-    def get_project_memberships(self, obj):
+    def get_project_memberships(self, obj) -> list[dict[str, Any]]:
         return [
             {
                 "project_id": str(m.project_id),

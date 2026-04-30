@@ -19,6 +19,7 @@ media/
 *.cookie
 *.cookies.txt
 smoke_report.json
+smoke_fast_report.json
 session.json
 login.json
 ctx.json

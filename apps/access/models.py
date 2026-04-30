@@ -30,6 +30,9 @@ SCOPE_GLOBAL = "global"
 SCOPE_COMPANY = "company"
 SCOPE_DEPARTMENT = "department"
 SCOPE_PROJECT = "project"
+SCOPE_TASK = "task"
+SCOPE_AI_WORKSPACE = "ai_workspace"
+SCOPE_MODULE = "module"
 SCOPE_SELF = "self"
 
 SCOPE_CHOICES = (
@@ -37,6 +40,9 @@ SCOPE_CHOICES = (
     (SCOPE_COMPANY, "Company"),
     (SCOPE_DEPARTMENT, "Department"),
     (SCOPE_PROJECT, "Project"),
+    (SCOPE_TASK, "Task"),
+    (SCOPE_AI_WORKSPACE, "AI workspace"),
+    (SCOPE_MODULE, "Module"),
     (SCOPE_SELF, "Self"),
 )
 
@@ -46,7 +52,10 @@ SCOPE_BREADTH_ORDER = {
     SCOPE_COMPANY: 1,
     SCOPE_DEPARTMENT: 2,
     SCOPE_PROJECT: 2,
-    SCOPE_SELF: 3,
+    SCOPE_MODULE: 2,
+    SCOPE_TASK: 3,
+    SCOPE_AI_WORKSPACE: 3,
+    SCOPE_SELF: 4,
 }
 
 
@@ -346,6 +355,79 @@ class PermissionGrant(models.Model):
         return self.status == self.STATUS_ACTIVE
 
 
+class PermissionDeny(models.Model):
+    """Explicit deny rule for a user/permission/scope.
+
+    Deny entries are checked before grants in the resolver:
+        deny > allow
+    """
+
+    STATUS_ACTIVE = "active"
+    STATUS_REVOKED = "revoked"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = (
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_REVOKED, "Revoked"),
+        (STATUS_EXPIRED, "Expired"),
+    )
+
+    SOURCE_MANUAL = "manual"
+    SOURCE_POLICY = "policy"
+    SOURCE_SYSTEM = "system"
+    SOURCE_CHOICES = (
+        (SOURCE_MANUAL, "Manual"),
+        (SOURCE_POLICY, "Policy"),
+        (SOURCE_SYSTEM, "System"),
+    )
+
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="access_denies",
+    )
+    permission_code = models.CharField(max_length=128)
+    scope_type = models.CharField(max_length=32, choices=SCOPE_CHOICES, default=SCOPE_GLOBAL)
+    scope_id = models.CharField(max_length=128, blank=True, default="")
+
+    denied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="issued_access_denies",
+    )
+    denied_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_access_denies",
+    )
+
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    source_type = models.CharField(max_length=32, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    source_id = models.CharField(max_length=128, blank=True, default="")
+    note = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("employee", "status")),
+            models.Index(fields=("permission_code", "status")),
+            models.Index(fields=("scope_type", "scope_id")),
+        ]
+        ordering = ("-denied_at",)
+
+    def __str__(self) -> str:
+        return (
+            f"DENY:{self.employee_id}:{self.permission_code}"
+            f"@{self.scope_type}:{self.scope_id}/{self.status}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Delegation rules
 # ---------------------------------------------------------------------------
@@ -418,6 +500,8 @@ class PermissionAuditLog(models.Model):
     ACTION_TEMPLATE_REMOVED = "template_removed"
     ACTION_DEFINITION_UPDATED = "definition_updated"
     ACTION_RULE_UPDATED = "rule_updated"
+    ACTION_DENY_CREATED = "deny_created"
+    ACTION_DENY_REVOKED = "deny_revoked"
 
     ACTION_CHOICES = (
         (ACTION_GRANT_CREATED, "Grant created"),
@@ -430,6 +514,8 @@ class PermissionAuditLog(models.Model):
         (ACTION_TEMPLATE_REMOVED, "Template removed"),
         (ACTION_DEFINITION_UPDATED, "Permission definition updated"),
         (ACTION_RULE_UPDATED, "Delegation rule updated"),
+        (ACTION_DENY_CREATED, "Deny created"),
+        (ACTION_DENY_REVOKED, "Deny revoked"),
     )
 
     actor = models.ForeignKey(
