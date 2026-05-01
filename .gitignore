@@ -34,3 +34,8 @@ alias*.json
 htmlcov/
 .coverage
 coverage.xml
+
+# Agent / local exports and scratch (do not commit generated trees or temp docs)
+output/
+scratch/
+*.doc

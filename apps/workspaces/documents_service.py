@@ -206,10 +206,14 @@ def create_workspace_document_upload(request, upload) -> dict:
                 content_type=content_type,
                 max_bytes=MAX_UPLOAD_BYTES,
             )
+        except ValueError as exc:
+            if str(exc) == "File too large (max 15MB).":
+                raise ValidationError({"file": "File too large (max 15MB)."}) from exc
+            s3_runtime.log_object_storage_upload_failure(exc, "workspace_cabinet_upload")
+            raise ValidationError({"file": s3_runtime.OBJECT_STORAGE_UPLOAD_FAILED_USER_MESSAGE}) from exc
         except Exception as exc:
-            raise ValidationError(
-                {"file": f"Не удалось сохранить файл в объектном хранилище: {exc}"},
-            ) from exc
+            s3_runtime.log_object_storage_upload_failure(exc, "workspace_cabinet_upload")
+            raise ValidationError({"file": s3_runtime.OBJECT_STORAGE_UPLOAD_FAILED_USER_MESSAGE}) from exc
         obj = WorkspaceCabinetDocument.objects.create(
             user=user,
             title=name,

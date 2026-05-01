@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
+
+# Shown to API clients; never interpolate raw boto/botocore exceptions into this.
+OBJECT_STORAGE_UPLOAD_FAILED_USER_MESSAGE = (
+    "Не удалось сохранить файл в объектном хранилище. Попробуйте позже."
+)
+
+
+def log_object_storage_upload_failure(exc: BaseException, context: str) -> None:
+    logger.warning("object_storage upload failed context=%s", context, exc_info=exc)
 
 if TYPE_CHECKING:
     from apps.storage.models import StorageProvider

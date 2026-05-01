@@ -248,9 +248,8 @@ def create_project_document_upload(request, project: Project, upload) -> dict:
                 body=body,
             )
         except Exception as exc:
-            raise ValidationError(
-                {"file": f"Не удалось сохранить файл в объектном хранилище: {exc}"},
-            ) from exc
+            s3_runtime.log_object_storage_upload_failure(exc, "project_document_upload")
+            raise ValidationError({"file": s3_runtime.OBJECT_STORAGE_UPLOAD_FAILED_USER_MESSAGE}) from exc
         obj = ProjectDocument.objects.create(
             project=project,
             uploaded_by=request.user,
