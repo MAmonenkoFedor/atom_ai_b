@@ -22,6 +22,8 @@ def _as_metadata_only(doc: dict) -> dict:
     return row
 
 
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
 _ALLOWED_DOC_UPLOAD_SUFFIXES = frozenset(
     {
         ".pdf",
@@ -81,6 +83,14 @@ def _owner_label(employee_id: str) -> str:
     return str(header.get("full_name") or "Employee")
 
 
+def _resolve_owner_context(username: str) -> tuple[str, str]:
+    """Resolve employee id and display label once per request path."""
+    from apps.workspaces import data as workspace_data
+
+    employee_id = workspace_data.resolve_employee_id_for_username(username)
+    return employee_id, _owner_label(employee_id)
+
+
 def _seed_defaults_for_user(user, employee_id: str) -> list[WorkspaceCabinetDocument]:
     owner = _owner_label(employee_id)
     rows = [
@@ -98,8 +108,6 @@ def _seed_defaults_for_user(user, employee_id: str) -> list[WorkspaceCabinetDocu
 
 
 def list_workspace_documents(request) -> list[dict]:
-    from apps.workspaces import data as workspace_data
-
     user = request.user
     resource = SimpleNamespace(user_id=user.id, id=None)
     read_decision = resolve_access(
@@ -120,7 +128,7 @@ def list_workspace_documents(request) -> list[dict]:
         if not metadata_decision.allowed:
             raise PermissionDenied("You do not have permission to view workspace documents.")
 
-    employee_id = workspace_data.resolve_employee_id_for_username(user.username)
+    employee_id, _ = _resolve_owner_context(user.username)
     qs = WorkspaceCabinetDocument.objects.filter(user=user).order_by("-updated_at")
     orm_rows = list(qs)
     if not orm_rows:
@@ -133,8 +141,6 @@ def list_workspace_documents(request) -> list[dict]:
 
 
 def create_workspace_document_link(request, title: str, url: str) -> dict:
-    from apps.workspaces import data as workspace_data
-
     user = request.user
     decision = resolve_access(
         user=user,
@@ -145,8 +151,7 @@ def create_workspace_document_link(request, title: str, url: str) -> dict:
     )
     if not decision.allowed:
         raise PermissionDenied("You do not have permission to create workspace document links.")
-    employee_id = workspace_data.resolve_employee_id_for_username(user.username)
-    owner = _owner_label(employee_id)
+    _, owner = _resolve_owner_context(user.username)
     obj = WorkspaceCabinetDocument.objects.create(
         user=user,
         title=title.strip(),
@@ -159,8 +164,6 @@ def create_workspace_document_link(request, title: str, url: str) -> dict:
 
 
 def create_workspace_document_upload(request, upload) -> dict:
-    from apps.workspaces import data as workspace_data
-
     user = request.user
     decision = resolve_access(
         user=user,
@@ -171,15 +174,16 @@ def create_workspace_document_upload(request, upload) -> dict:
     )
     if not decision.allowed:
         raise PermissionDenied("You do not have permission to upload workspace documents.")
-    employee_id = workspace_data.resolve_employee_id_for_username(user.username)
-    owner = _owner_label(employee_id)
+    _, owner = _resolve_owner_context(user.username)
 
     name = get_valid_filename(upload.name)
+    if not name.strip():
+        raise ValidationError({"file": "Invalid file name."})
     suffix = Path(name).suffix.lower()
     if suffix not in _ALLOWED_DOC_UPLOAD_SUFFIXES:
         raise ValidationError({"file": "Unsupported file type."})
     size = getattr(upload, "size", None) or 0
-    if size > 15 * 1024 * 1024:
+    if size > MAX_UPLOAD_BYTES:
         raise ValidationError({"file": "File too large (max 15MB)."})
 
     assert_workspace_upload_allowed(user_id=user.id, incoming_bytes=int(size))
@@ -200,7 +204,7 @@ def create_workspace_document_upload(request, upload) -> dict:
                 object_key=object_key,
                 fileobj=fileobj,
                 content_type=content_type,
-                max_bytes=15 * 1024 * 1024,
+                max_bytes=MAX_UPLOAD_BYTES,
             )
         except Exception as exc:
             raise ValidationError(
