@@ -15,7 +15,7 @@ Archetypes covered:
 Endpoints checked:
 
 * ``GET  /api/v1/projects/<id>``                  (visibility)
-* ``PATCH /api/v1/projects/<id>``                 (project.edit)
+* ``PATCH /api/v1/projects/<id>``                 (project.update / project.manage_settings by field)
 * ``GET  /api/v1/projects/<id>/members``          (visibility of related list)
 * ``POST /api/v1/projects/<id>/members``          (project.assign_members)
 * ``POST /api/v1/projects/<id>/documents/link``   (docs.upload)

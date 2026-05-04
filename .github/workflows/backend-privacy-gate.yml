@@ -10,6 +10,7 @@ on:
       - "apps/ai/**"
       - "apps/workspaces/**"
       - "apps/projects/**"
+      - "apps/orgstructure/**"
       - ".github/workflows/backend-privacy-gate.yml"
   push:
     branches:
@@ -23,6 +24,7 @@ on:
       - "apps/ai/**"
       - "apps/workspaces/**"
       - "apps/projects/**"
+      - "apps/orgstructure/**"
       - ".github/workflows/backend-privacy-gate.yml"
 
 jobs:
@@ -124,4 +126,5 @@ jobs:
             apps.access.tests \
             apps.ai.tests.test_chat_workspace_privacy \
             apps.workspaces.tests \
-            apps.projects.tests
+            apps.projects.tests \
+            apps.orgstructure.tests

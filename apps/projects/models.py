@@ -38,6 +38,11 @@ class Project(models.Model):
     code = models.CharField(max_length=64, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    public_summary = models.TextField(blank=True, default="")
+    planned_start = models.DateField(null=True, blank=True)
+    planned_end = models.DateField(null=True, blank=True)
+    """Structured settings (visibility, workflow, AI defaults, …) — shallow-merge on PATCH."""
+    project_settings = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

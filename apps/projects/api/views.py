@@ -22,6 +22,7 @@ from apps.projects.list_annotations import (
 )
 from apps.projects.lead_payload import batch_project_lead_payload
 from apps.projects.models import Project, ProjectMember, ProjectResourceRequest
+from apps.projects.project_patch import classify_project_patch_keys, sensitive_patch_keys
 from apps.projects.project_lead import assign_project_lead, clear_project_lead, get_project_for_lead_endpoint
 from apps.projects.project_permissions import (
     require_project_access,
@@ -45,7 +46,6 @@ from .serializers import (
 )
 
 User = get_user_model()
-
 
 class ProjectListView(generics.ListCreateAPIView):
     queryset = base_project_queryset()
@@ -309,32 +309,140 @@ class ProjectDetailView(generics.RetrieveAPIView):
 
     def patch(self, request, *args, **kwargs):
         project = self.get_object()
-        decision = require_project_action(
-            request.user,
-            project,
-            "project.edit",
-            "You do not have permission to edit this project.",
-        )
+        old_settings = project.project_settings if isinstance(project.project_settings, dict) else {}
+        old_visibility = old_settings.get("visibility")
         serializer = self.get_serializer(project, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        touched = set(validated.keys())
+        update_keys, settings_keys, dangerous_keys = classify_project_patch_keys(touched)
+        sensitive_sorted = sorted(sensitive_patch_keys(touched) | dangerous_keys)
+
+        audit_policies: dict[str, dict[str, str]] = {}
+        decisions: dict[str, object] = {}
+        needs_settings_gate = bool(settings_keys) or bool(dangerous_keys)
+
+        if update_keys:
+            d = require_project_access(
+                request.user,
+                project,
+                "project.update",
+                "You do not have permission to update this project.",
+            )
+            audit_policies["project.update"] = policy_audit_payload(d)
+            decisions["project.update"] = d
+        if needs_settings_gate:
+            d = require_project_access(
+                request.user,
+                project,
+                "project.manage_settings",
+                "You do not have permission to change project settings (e.g. primary department or policy bundle).",
+            )
+            audit_policies["project.manage_settings"] = policy_audit_payload(d)
+            decisions["project.manage_settings"] = d
+        if not audit_policies:
+            d = require_project_access(
+                request.user,
+                project,
+                "project.update",
+                "You do not have permission to update this project.",
+            )
+            audit_policies["project.update"] = policy_audit_payload(d)
+            decisions["project.update"] = d
+
         serializer.save()
         updated = self.get_queryset().get(pk=project.pk)
+
+        dominant = decisions.get("project.manage_settings") or decisions.get("project.update")
+        base_payload = {
+            "changed_fields": sorted(touched),
+            "sensitive_fields": sensitive_sorted,
+            "policy_actions": sorted(audit_policies.keys()),
+            "policies": audit_policies,
+            **policy_audit_payload(dominant),
+        }
         emit_audit_event(
             request,
             event_type="project.updated",
             entity_type="project",
             action="update",
-            entity_id=str(project.pk),
-            project_id=str(project.pk),
-            payload={
-                "fields": sorted(serializer.validated_data.keys()),
-                **policy_audit_payload(decision),
-            },
+            entity_id=str(updated.pk),
+            project_id=str(updated.pk),
+            payload=base_payload,
         )
+        if needs_settings_gate:
+            ms = decisions.get("project.manage_settings")
+            if ms is not None:
+                emit_audit_event(
+                    request,
+                    event_type="project.settings_updated",
+                    entity_type="project",
+                    action="settings_update",
+                    entity_id=str(updated.pk),
+                    project_id=str(updated.pk),
+                    payload={
+                        "changed_fields": sorted(touched),
+                        "sensitive_fields": sensitive_sorted,
+                        "policies": {"project.manage_settings": audit_policies["project.manage_settings"]},
+                        **policy_audit_payload(ms),
+                    },
+                )
+        new_settings = (
+            updated.project_settings if isinstance(updated.project_settings, dict) else {}
+        )
+        new_visibility = new_settings.get("visibility")
+        if "project_settings" in touched and old_visibility != new_visibility:
+            ms = decisions.get("project.manage_settings")
+            emit_audit_event(
+                request,
+                event_type="project.visibility_changed",
+                entity_type="project",
+                action="visibility_change",
+                entity_id=str(updated.pk),
+                project_id=str(updated.pk),
+                payload={
+                    "old": old_visibility,
+                    "new": new_visibility,
+                    **(policy_audit_payload(ms) if ms is not None else {}),
+                },
+            )
+
         return Response(
             ProjectSerializer(updated, context=self.get_serializer_context()).data,
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        operation_id="projectDestroy",
+        request=None,
+        responses={204: OpenApiResponse(description="Project permanently deleted.")},
+    )
+    def delete(self, request, *args, **kwargs):
+        project = self.get_object()
+        pk = project.pk
+        org_id = project.organization_id
+        name = project.name
+        decision = require_project_access(
+            request.user,
+            project,
+            "project.delete",
+            "You do not have permission to delete this project.",
+        )
+        emit_audit_event(
+            request,
+            event_type="project.deleted",
+            entity_type="project",
+            action="delete",
+            entity_id=str(pk),
+            project_id=str(pk),
+            payload={
+                "name": name,
+                "organization_id": str(org_id),
+                **policy_audit_payload(decision),
+            },
+        )
+        project.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ProjectArchiveView(APIView):

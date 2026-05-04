@@ -29,6 +29,7 @@ from django.db import models
 SCOPE_GLOBAL = "global"
 SCOPE_COMPANY = "company"
 SCOPE_DEPARTMENT = "department"
+SCOPE_EMPLOYEE = "employee"
 SCOPE_PROJECT = "project"
 SCOPE_TASK = "task"
 SCOPE_AI_WORKSPACE = "ai_workspace"
@@ -39,6 +40,7 @@ SCOPE_CHOICES = (
     (SCOPE_GLOBAL, "Global"),
     (SCOPE_COMPANY, "Company"),
     (SCOPE_DEPARTMENT, "Department"),
+    (SCOPE_EMPLOYEE, "Employee"),
     (SCOPE_PROJECT, "Project"),
     (SCOPE_TASK, "Task"),
     (SCOPE_AI_WORKSPACE, "AI workspace"),
@@ -51,6 +53,7 @@ SCOPE_BREADTH_ORDER = {
     SCOPE_GLOBAL: 0,
     SCOPE_COMPANY: 1,
     SCOPE_DEPARTMENT: 2,
+    SCOPE_EMPLOYEE: 2,
     SCOPE_PROJECT: 2,
     SCOPE_MODULE: 2,
     SCOPE_TASK: 3,

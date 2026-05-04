@@ -6,6 +6,7 @@ from django.test import TestCase
 
 from apps.access.policies import resolve_access
 from apps.organizations.models import Organization
+from apps.orgstructure.models import OrgUnit
 from apps.projects.models import Project
 
 User = get_user_model()
@@ -124,3 +125,39 @@ class ResolveDocumentAccessTests(TestCase):
         )
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "unsupported_action")
+
+    @patch("apps.orgstructure.department_permissions.get_department_membership")
+    @patch("apps.access.policies.access_resolver.has_permission")
+    def test_department_document_read_via_membership(self, has_permission, get_membership):
+        ou = OrgUnit.objects.create(organization=self.org, name="DeptDoc", code="dd")
+        has_permission.return_value = False
+        get_membership.return_value = SimpleNamespace()
+
+        decision = resolve_access(
+            user=self.user,
+            action="document.read",
+            scope_type="document",
+            scope_id=str(ou.pk),
+            resource=ou,
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.access_level, "read")
+        self.assertEqual(decision.reason, "department_membership")
+
+    @patch("apps.orgstructure.department_permissions.has_department_access_permission")
+    @patch("apps.access.policies.access_resolver.has_permission")
+    def test_department_document_upload_via_manage_documents(self, has_permission, has_department_access):
+        ou = OrgUnit.objects.create(organization=self.org, name="DeptDoc2", code="dd2")
+        has_department_access.return_value = True
+        has_permission.return_value = False
+
+        decision = resolve_access(
+            user=self.user,
+            action="document.upload",
+            scope_type="document",
+            scope_id=str(ou.pk),
+            resource=ou,
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.access_level, "write")
+        self.assertEqual(decision.reason, "permission:department.manage_documents")

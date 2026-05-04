@@ -6,6 +6,7 @@ from rest_framework import serializers
 from apps.organizations.models import Organization, OrganizationMember
 from apps.orgstructure.models import OrgUnit
 from apps.projects.models import Project, ProjectMember, ProjectResourceRequest
+from apps.projects.project_patch import ALLOWED_PROJECT_SETTINGS_KEYS
 from apps.projects.project_permissions import (
     ProjectAccessContext,
     can_manage_project,
@@ -67,6 +68,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     project_lead_email = serializers.SerializerMethodField()
     lead_bundle_permissions = serializers.SerializerMethodField()
     lead_history = serializers.SerializerMethodField()
+    settings = serializers.JSONField(source="project_settings", read_only=True)
 
     class Meta:
         model = Project
@@ -76,6 +78,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             "code",
             "name",
             "description",
+            "public_summary",
+            "planned_start",
+            "planned_end",
+            "settings",
             "status",
             "owner_id",
             "owner_name",
@@ -317,10 +323,48 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    settings = serializers.JSONField(source="project_settings", required=False)
 
     class Meta:
         model = Project
-        fields = ("name", "description", "status", "code", "primary_org_unit")
+        fields = (
+            "name",
+            "description",
+            "status",
+            "code",
+            "public_summary",
+            "planned_start",
+            "planned_end",
+            "primary_org_unit",
+            "settings",
+        )
+
+    def validate(self, attrs):
+        raw_settings = attrs.get("project_settings")
+        if raw_settings is not None:
+            if not isinstance(raw_settings, dict):
+                raise serializers.ValidationError({"settings": "Must be a JSON object."})
+            unknown = set(raw_settings) - ALLOWED_PROJECT_SETTINGS_KEYS
+            if unknown:
+                raise serializers.ValidationError(
+                    {
+                        "settings": (
+                            "Unsupported keys: " + ", ".join(sorted(unknown))
+                        )
+                    }
+                )
+        return attrs
+
+    def update(self, instance, validated_data):
+        incoming_settings = validated_data.pop("project_settings", None)
+        instance = super().update(instance, validated_data)
+        if incoming_settings is not None:
+            current = instance.project_settings
+            if not isinstance(current, dict):
+                current = {}
+            instance.project_settings = {**current, **incoming_settings}
+            instance.save(update_fields=["project_settings", "updated_at"])
+        return instance
 
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
